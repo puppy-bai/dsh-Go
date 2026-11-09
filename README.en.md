@@ -220,7 +220,8 @@ val duration = if (long) ViewConfiguration.getLongPressTimeout().toLong() + 300 
 
 `gesture` replaces that with raw-coordinate gestures on the numbered screenshot (`screen` with
 `image`). Every point is a pixel on that screenshot (its W×H), nothing is resolved from the tree,
-and each call is confirmed by you, exactly like `tap_xy`.
+and each call is confirmed by you, exactly like `tap_xy`. (The 15th tool, `input` — typing at a
+coordinate — is [below](#input).)
 
 | `kind` | What it does | Required | Optional |
 | --- | --- | --- | --- |
@@ -260,9 +261,61 @@ permission pages and unreadable screens are still refused, and the background sc
 self-ADB) still works by element number only. Details, limits and known trade-offs are in
 [docs/gesture-en.md](docs/gesture-en.md) (Chinese: [docs/gesture-zh.md](docs/gesture-zh.md)).
 
+<a id="input"></a>
+## Coordinate input and tapping by text (added by this fork)
+
+Upstream has exactly one way to write text: `type`, which takes an element id. Filling one field took three calls —
+`screen` to find the id, `tap` to focus the field, `type` to write it — and the field the tap opened had a new id by the
+next screen. This fork adds a 15th tool, `input`, which packs tap, focus, write, read-back and keyboard folding into one
+call; `tap` also gains `text`, and `screen` / `scroll` gain `until`.
+
+### `input`: type at a coordinate
+
+| Parameter | Required | Meaning |
+| --- | --- | --- |
+| `observation` | yes | Screen id of the latest `screen`, which must have carried `image`; coordinates are that screenshot's pixels |
+| `x` `y` | yes | Pixel coordinates of the field on the numbered screenshot |
+| `text` | yes | Text to write, at most 2000 characters |
+| `submit` | no | Send one IME enter after writing |
+
+It tries four things in a row on the device and returns only when one of them lands:
+
+1. tap the point and wait for the UI to settle;
+2. find the current focus (`findFocus(FOCUS_INPUT)`) in any window; if it is editable, write with `ACTION_SET_TEXT` and
+   read back every 100 ms for 1.5 s to prove the text arrived (whitespace, hyphens and zero-width characters ignored);
+3. if focus did not land there, hold the point for 600 ms and look again — many WebView pages only focus on a real press;
+4. otherwise use the clipboard: `ACTION_PASTE`, and if the node does not accept a paste, press again and click
+   「粘贴」/「Paste」 by text in the menu that appears.
+
+The back key is sent only when the keyboard really is up (it would cover the next screenshot's coordinates). Password
+fields are refused: the confirmation card shows the app, coordinates and character count but never the text, because the
+focused field could be a password box. The action log stores the length only.
+
+```json
+{"observation": "s7", "x": 540, "y": 760, "text": "13800138000"}
+```
+
+The coordinate guards are the same as `tap_xy`: stale screen id, a point outside the screenshot, DSH's own UI, system
+permission pages, unreadable screens and "cannot confirm the screen still matches" are all refused, and the background
+screen still addresses elements only.
+
+### The other three parameters
+
+- `tap` gains `text`: tap by the words on screen instead of looking up an id first (`id` and `text` are mutually
+  exclusive). Matching runs five tiers — element text equal, row text equal, element text contains, row text contains,
+  `viewId` contains — keeps actionable candidates only, and **refuses an ambiguous match** with the candidate list
+  (`#7「删除」、#8「删除」`) instead of guessing.
+- `screen` gains `until`: wait up to 5 s for that text before returning; `detail:true` now prints element bounds
+  (`left,top-right,bottom`) instead of a centre point.
+- `scroll` gains `until` / `max`: scroll in that direction until the text appears (10 times by default).
+
+Self-test order on a phone: `screen` with `image` → `input` into a normal field → `input` with `submit` → `tap` with
+`text` → `scroll` with `until`. Details and limits are in [docs/input-en.md](docs/input-en.md)
+(Chinese: [docs/input-zh.md](docs/input-zh.md)).
+
 ### Build and signing differences in this fork
 
-- Built with `tooling/build-apk.sh --build-name 1.0.14 -f arm64` on Windows, through
+- Built with `tooling/build-apk.sh --build-name 1.0.15 -f arm64` on Windows, through
   `toolchain/env-win.sh` (JDK 17, Flutter 3.47.7, Android SDK 36, NDK 28.2.13676358).
 - `runtime/out/arm64-v8a/{assets,jniLibs}` comes from the official upstream `v1.0.13` arm64
   package, so the runtime is identical to upstream `v1.0.13`. It is gitignored, as upstream does —
