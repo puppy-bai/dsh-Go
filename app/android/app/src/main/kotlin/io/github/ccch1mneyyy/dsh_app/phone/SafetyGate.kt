@@ -163,7 +163,7 @@ object SafetyRules {
 }
 
 /** The kinds of writes the gate distinguishes. */
-enum class WriteKind { TAP, LONG_TAP, TYPE, TAP_XY, GESTURE, SCROLL, KEY }
+enum class WriteKind { TAP, LONG_TAP, TYPE, TAP_XY, GESTURE, INPUT, SCROLL, KEY }
 
 /**
  * Applies the safety rules to one action and asks the person when a rule says so, through [gate]
@@ -252,6 +252,7 @@ class SafetyGate(
         val reason = when {
             kind == WriteKind.TAP_XY -> "tap_xy"
             kind == WriteKind.GESTURE -> "gesture"
+            kind == WriteKind.INPUT -> "input"
             kind == WriteKind.TYPE && submit -> "submit"
             word != null -> "sensitive:$word"
             everyWrite -> "every-write"
@@ -352,6 +353,7 @@ class SafetyGate(
             WriteKind.LONG_TAP -> uiText.get("phone_confirm_long_tap", "在「%1\$s」长按「%2\$s」", app, label) // l10n:keep test default
             WriteKind.TYPE -> uiText.get("phone_confirm_type", "在「%1\$s」的「%2\$s」输入：\"%3\$s\"", app, label, if (typed == SafetyRules.MASK) typed else SafetyRules.quoteText(typed ?: "")) + if (submit) uiText.get("phone_confirm_submit", "，然后发送 / 提交") else "" // l10n:keep test default
             WriteKind.TAP_XY -> uiText.get("phone_confirm_tap_xy", "在「%1\$s」点截图上的位置 (%2\$s, %3\$s)", app, point?.first.toString(), point?.second.toString()) // l10n:keep test default
+            WriteKind.INPUT -> uiText.get("phone_confirm_input", "在「%1\$s」按截图上的位置 (%2\$s, %3\$s) 输入文字", app, point?.first.toString(), point?.second.toString()) // l10n:keep test default
             WriteKind.SCROLL -> uiText.get("phone_confirm_scroll", "在「%1\$s」滚动", app) // l10n:keep test default
             WriteKind.GESTURE -> uiText.get("phone_confirm_gesture", "在「%1\$s」做手势：%2\$s", app, note ?: "") // l10n:keep test default
             WriteKind.KEY -> uiText.get("phone_confirm_key", "按系统键") // l10n:keep test default

@@ -9938,6 +9938,9 @@ class L10nEn extends L10n {
   String get phoneToolGesture => 'Gesture';
 
   @override
+  String get phoneToolInput => 'Type at point';
+
+  @override
   String get phoneToolHandoff => 'Hand back to you';
 
   @override

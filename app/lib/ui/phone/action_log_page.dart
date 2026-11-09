@@ -23,6 +23,7 @@ String phoneToolLabel(String tool) {
     'key' => appL10n.phoneToolKey,
     'tap_xy' => appL10n.phoneToolTapCoordinates,
     'gesture' => appL10n.phoneToolGesture,
+    'input' => appL10n.phoneToolInput,
     'handoff' => appL10n.phoneToolHandoff,
     'open' => appL10n.phoneToolOpenApp,
     'apps' => appL10n.phoneToolListApps,

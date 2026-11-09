@@ -163,7 +163,9 @@ class PhoneCore(
             PhoneToolCatalog.CLIPBOARD -> clipboard(a, owner)
             PhoneToolCatalog.SCREEN -> screen(a, owner)
             PhoneToolCatalog.COLLECT -> collect(a, owner)
-            PhoneToolCatalog.TAP, PhoneToolCatalog.TYPE, PhoneToolCatalog.SCROLL, PhoneToolCatalog.TAP_XY, PhoneToolCatalog.GESTURE -> act(name, a, scope, owner)
+            PhoneToolCatalog.TAP -> if (a.int("id") == null) tapByText(a, scope, owner) else act(name, a, scope, owner)
+            PhoneToolCatalog.SCROLL -> if (a.str("until") != null) scrollUntil(a, scope, owner) else act(name, a, scope, owner)
+            PhoneToolCatalog.TYPE, PhoneToolCatalog.TAP_XY, PhoneToolCatalog.GESTURE, PhoneToolCatalog.INPUT -> act(name, a, scope, owner)
             PhoneToolCatalog.KEY -> key(a, owner)
             PhoneToolCatalog.HANDOFF -> handoff(a, scope, owner)
             // l10n:keep agent tool result
@@ -413,7 +415,22 @@ class PhoneCore(
         lastScreen = which
         say(if (which == PhoneScreen.BACKGROUND) ui.get("phone_reading_background", "DSH 正在看后台屏") else ui.get("phone_reading_screen", "DSH 正在看屏幕")) // l10n:keep test default
         if (!current(owner)) return stoppedOut(summary)
-        val snap = driver.observe(detail = a.bool("detail") == true, image = a.bool("image") == true)
+        val detail = a.bool("detail") == true
+        val image = a.bool("image") == true
+        var snap = driver.observe(detail = detail, image = image)
+        // `until`: the page often draws after the screen was read; watch it for a moment instead of
+        // making the model poll with more calls (the same idea as collect's until).
+        a.str("until")?.let { until ->
+            val deadline = System.currentTimeMillis() + 5_000
+            while (!snap.text.contains(until) && System.currentTimeMillis() < deadline && current(owner)) {
+                try {
+                    Thread.sleep(250)
+                } catch (_: InterruptedException) {
+                    return stoppedOut(summary)
+                }
+                snap = driver.observe(detail = detail, image = image)
+            }
+        }
         if (!current(owner) || !tasks.setAppIfCurrent(owner, snap.appLabel)) return stoppedOut(summary)
         val shown = safety.filterScreen(snap)
         if (!current(owner)) return stoppedOut(summary)
@@ -471,10 +488,81 @@ class PhoneCore(
         return Out(text, screen = screen, app = screen?.appLabel ?: pkg, summary = summary, decision = "ok")
     }
 
+    /**
+     * `tap` with `text`: the element is found by the words the person sees, then the ordinary
+     * `tap` runs on its id — so the fingerprint re-check, the safety gate and the confirmation
+     * are exactly the same. A tie is refused with the candidates, never guessed.
+     */
+    private fun tapByText(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner): Out {
+        if (!current(owner)) return stoppedOut(PhoneToolCatalog.TAP)
+        val sid = a.str("screen")
+        val which = when (val r = routeScreenId(sid, "screen")) {
+            is Either.Left -> return Out(r.value, error = true)
+            is Either.Right -> r.value
+        }
+        sid!!
+        // l10n:keep agent tool result
+        val text = a.str("text") ?: return Out("tap 需要 id 或者 text：元素编号，或者界面上看得见的文字。", error = true)
+        val driver = when (val d = driverFor(which)) {
+            is Either.Left -> return Out(d.value, error = true)
+            is Either.Right -> d.value
+        }
+        val found = when (val f = driver.find(sid, text)) {
+            is Either.Left -> return Out(f.value, error = true)
+            is Either.Right -> f.value
+        }
+        val args = linkedMapOf<String, Any?>("screen" to sid, "id" to found)
+        if (a.bool("long") == true) args["long"] = true
+        return act(PhoneToolCatalog.TAP, Args(args), scope, owner)
+    }
+
+    /**
+     * `scroll` with `until`: scrolls in the given direction until the text shows up, at most `max`
+     * times. Every step is an ordinary scroll, so the gate and the confirmations are the same;
+     * the result is the screen where it stopped.
+     */
+    private fun scrollUntil(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner): Out {
+        if (!current(owner)) return stoppedOut(PhoneToolCatalog.SCROLL)
+        val sid = a.str("screen")
+        val which = when (val r = routeScreenId(sid, "screen")) {
+            is Either.Left -> return Out(r.value, error = true)
+            is Either.Right -> r.value
+        }
+        sid!!
+        val screenId: String = sid
+        val until = a.str("until")!!
+        val max = (a.int("max") ?: 10).coerceIn(1, 20)
+        val direction = a.str("direction")
+        val id = a.int("id")
+        var out: Out? = null
+        for (step in 1..max) {
+            val args = linkedMapOf<String, Any?>("screen" to screenId, "direction" to direction)
+            if (id != null) args["id"] = id
+            val step1 = act(PhoneToolCatalog.SCROLL, Args(args), scope, owner)
+            out = step1
+            if (step1.error) return step1
+            val snap = step1.screen
+            if (snap != null && snap.text.contains(until)) {
+                // l10n:keep agent tool result
+                return Out("滚了 $step 次，出现了「$until」。", screen = snap, app = step1.app, summary = step1.summary, decision = "until")
+            }
+            if (!current(owner)) return stoppedOut(step1.summary ?: PhoneToolCatalog.SCROLL)
+        }
+        // l10n:keep agent tool result
+        return Out(
+            "滚了 $max 次也没看到「$until」。看看屏幕：可能还要多滚几屏，或者文字不一样。",
+            error = true,
+            screen = out?.screen,
+            app = out?.app,
+            summary = out?.summary,
+            decision = "untilMissing",
+        )
+    }
+
     /** tap / type / scroll / tap_xy / gesture: route, resolve, gate, perform. */
     private fun act(name: String, a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner): Out {
         if (!current(owner)) return stoppedOut(name)
-        val coordinate = name == PhoneToolCatalog.TAP_XY || name == PhoneToolCatalog.GESTURE
+        val coordinate = name == PhoneToolCatalog.TAP_XY || name == PhoneToolCatalog.GESTURE || name == PhoneToolCatalog.INPUT
         val screenParameter = if (coordinate) "observation" else "screen"
         val sid = a.str(screenParameter)
         val which = when (val r = routeScreenId(sid, screenParameter)) {
@@ -522,6 +610,26 @@ class PhoneCore(
                 action = PhoneAction.Scroll(sid, id, dir)
                 kind = WriteKind.SCROLL
                 summary = ui.get("phone_log_scroll", "滚动 %1\$s %2\$s", sid.toString(), dir.name.lowercase()) // l10n:keep test default
+            }
+            PhoneToolCatalog.INPUT -> {
+                // l10n:keep agent tool result
+                if (id != null) return Out("input 不用 id：直接给 x / y 指向输入框。按元素输入用 type。", error = true)
+                val x = a.int("x")
+                val y = a.int("y")
+                // l10n:keep agent tool result
+                if (x == null || y == null || x < 0 || y < 0) return Out("input 需要非负整数 x 和 y（截图像素）。", error = true)
+                // l10n:keep agent tool result
+                val filled = a.text("text") ?: return Out("input 需要 text。", error = true)
+                // l10n:keep agent tool result
+                if (filled.isBlank()) return Out("input 的 text 是空白。", error = true)
+                // l10n:keep agent tool result
+                if (filled.length > 2000) return Out("input 的 text 太长（最多 2000 字）。", error = true)
+                submit = a.bool("submit") == true
+                point = x to y
+                action = PhoneAction.Input(sid, x, y, filled, submit)
+                kind = WriteKind.INPUT
+                // Only the length: the target is unknown until the field is focused, so it could be a password.
+                summary = ui.get("phone_log_input_xy", "按坐标输入 %1\$d 字 (%2\$d,%3\$d)", filled.length, x, y) // l10n:keep test default
             }
             PhoneToolCatalog.GESTURE -> {
                 // l10n:keep agent tool result
@@ -601,6 +709,7 @@ class PhoneCore(
             WriteKind.SCROLL -> ui.get("phone_status_scroll", "滚动") // l10n:keep test default
             WriteKind.TAP_XY -> ui.get("phone_status_tap_xy", "点截图上的位置") // l10n:keep test default
             WriteKind.GESTURE -> ui.get("phone_status_gesture", "手势") // l10n:keep test default
+            WriteKind.INPUT -> ui.get("phone_status_input", "按坐标输入") // l10n:keep test default
             WriteKind.KEY -> ui.get("phone_status_key", "按键") // l10n:keep test default
         }
     }
@@ -741,6 +850,7 @@ class PhoneCore(
             PhoneToolCatalog.SCREEN -> 12_000L
             PhoneToolCatalog.COLLECT -> 120_000L
             PhoneToolCatalog.GESTURE -> 120_000L
+            PhoneToolCatalog.INPUT -> 25_000L
             PhoneToolCatalog.HANDOFF -> 30_000L
             else -> 30_000L
         }

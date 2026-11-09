@@ -2,6 +2,30 @@
 
 每个版本先中文、后英文。发版时把对应版本的正文（不含版本标题）作为 Release 正文，见 `docs/release.md`。
 
+## 1.0.15 · 2026-11-09
+
+### 中文
+
+- **手机操控新增第 15 个工具 `input`：按截图坐标写入，一次调用完成「点输入框 → 写入 → 回读 → 收键盘」。** 以前填空要 `screen` + `tap` + `type` 三次调用，而且点开的输入框到下一屏编号就变了。`input` 在设备端连续试：点坐标 → 找当前焦点 `ACTION_SET_TEXT` 写入并回读 1.5 秒校验 → 焦点没进去就长按 600ms 再找 → 还不行走剪贴板 `ACTION_PASTE`，节点不支持粘贴就在弹出的菜单里按文字点「粘贴」。写完只在键盘确实升起时发一次返回键，避免挡住下一张截图的坐标。
+- `tap` 新增 `text`：按界面上看得见的文字点，不用先查元素编号；`id` 与 `text` 二选一。一段文字匹配到多个元素时**拒绝并列**，把候选列出来要求用 `id` 指定，不猜。
+- `screen` 新增 `until`（等这段文字出现再返回，最多 5 秒）；`detail:true` 改为输出元素边界（`左上-右下`），不再是中心点。
+- `scroll` 新增 `until` / `max`：滚到出现指定文字为止（默认最多 10 次）。
+- 原有 14 个工具的名字与参数不变；`type`、`tap_xy`、`gesture` 的行为一字未改。
+- 安全边界没有放松：`input` 和 `tap_xy` 一样每次都要确认，确认卡片只显示坐标与字数、不显示要写的文字（焦点框可能是密码框），密码框一律拒绝，自己 App 的界面、系统权限页、读不到内容的页面照旧拒绝，后台屏仍只按元素编号。
+- 文档：新增 `docs/input-zh.md` 与 `docs/input-en.md`；README 增加「坐标输入与按文字操作」一节。
+- 验证：`TextSelector` 的 8 个 JVM 用例全过、`PhoneToolSchemaTest` 5 个用例全过（工具数 14 → 15）、`flutter analyze` 无问题、arm64 release 编译通过。**这四种路径（长按聚焦、剪贴板粘贴、菜单粘贴、收键盘）还没有在真机上验证过**，建议按 README 的自测顺序过一遍。
+
+### English
+
+- **Phone control gains a 15th tool, `input`: type at a screenshot coordinate, with "tap the field → write → read back → fold the keyboard" in one call.** Filling a form used to take three calls (`screen` + `tap` + `type`), and the field a tap opened had a new element id on the next screen. `input` tries, on the device: tap the point → find the current focus and write with `ACTION_SET_TEXT`, reading back for 1.5 s → if focus did not land, press for 600 ms and look again → otherwise use the clipboard (`ACTION_PASTE`), and if the node does not accept a paste, long-press and click 「粘贴」/「Paste」 in the menu by text. The back key is sent only when the keyboard really is up, so it never eats the next screenshot's coordinates.
+- `tap` gains `text`: tap by the words on screen instead of looking up an element id first; `id` and `text` are mutually exclusive. When one piece of text matches several elements the call is **refused with the candidates** rather than guessed.
+- `screen` gains `until` (wait for this text, at most 5 s); `detail:true` now prints element bounds (`left,top-right,bottom`) instead of the centre point.
+- `scroll` gains `until` / `max`: scroll until the text appears (10 times by default).
+- The 14 existing tools keep their names and parameters; `type`, `tap_xy` and `gesture` are unchanged.
+- No safety rule was relaxed: `input` asks for confirmation every time, the card shows coordinates and character count but never the text (the field may be a password box), password fields are refused, DSH's own UI, system permission pages and unreadable screens are still refused, and the background screen still works by element number only.
+- Docs: `docs/input-zh.md` and `docs/input-en.md`; the README gains a "Coordinate input and tapping by text" section.
+- Verification: the 8 `TextSelector` JVM tests pass, `PhoneToolSchemaTest` passes (tool count 14 → 15), `flutter analyze` is clean, the arm64 release build succeeds. **The four fallback paths (press-to-focus, clipboard paste, menu paste, keyboard fold) have not been verified on a real phone yet**; the README self-test order is the place to start.
+
 ## 1.0.14 · 2026-11-09
 
 ### 中文

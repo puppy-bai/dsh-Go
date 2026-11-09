@@ -187,6 +187,7 @@
     <string name="phone_status_scroll">Scroll</string>
     <string name="phone_status_tap_xy">Tap a point on the screenshot</string>
     <string name="phone_status_gesture">Gesture</string>
+    <string name="phone_status_input">Type at a point</string>
     <string name="phone_status_key">Press a key</string>
     <string name="phone_status_press">DSH is acting · Press %1$s</string>
     <string name="phone_key_back">Back</string>
@@ -201,6 +202,7 @@
     <string name="phone_confirm_submit">, then send / submit</string>
     <string name="phone_confirm_tap_xy">Tap (%2$s, %3$s) on the screenshot in “%1$s”</string>
     <string name="phone_confirm_gesture">Do a gesture in “%1$s”: %2$s</string>
+    <string name="phone_confirm_input">Type into the point (%2$s, %3$s) in “%1$s”</string>
     <string name="phone_confirm_scroll">Scroll in “%1$s”</string>
     <string name="phone_confirm_key">Press a system key</string>
     <string name="phone_current_app">current app</string>
@@ -238,6 +240,7 @@
     <string name="phone_log_scroll">Scroll %1$s %2$s</string>
     <string name="phone_log_tap_xy">Tap %1$s (%2$d,%3$d)</string>
     <string name="phone_log_gesture">Gesture %1$s</string>
+    <string name="phone_log_input_xy">Type %1$d chars at (%2$d, %3$d)</string>
     <string name="phone_log_key">Press %1$s</string>
     <string name="phone_log_handoff">Hand over to you</string>
     <string name="phone_log_long_tap">Press and hold %1$s#%2$d</string>

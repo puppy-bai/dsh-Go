@@ -611,7 +611,10 @@ object ScreenFormat {
             // l10n:keep model screen format
             if (label.isEmpty() && item.role.isNotEmpty() && item.kind == ElementKind.ITEM && item.states.isEmpty()) sb.append(" (无文字)")
         }
-        if (detail) sb.append(" @").append(item.node.bounds.centerX).append(',').append(item.node.bounds.centerY)
+        if (detail) {
+            val b = item.node.bounds
+            sb.append(" @").append(b.left).append(',').append(b.top).append('-').append(b.right).append(',').append(b.bottom)
+        }
         return sb.toString()
     }
 

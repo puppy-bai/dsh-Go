@@ -182,6 +182,7 @@
     <string name="phone_status_scroll">滚动</string>
     <string name="phone_status_tap_xy">点截图上的位置</string>
     <string name="phone_status_gesture">手势</string>
+    <string name="phone_status_input">按坐标输入</string>
     <string name="phone_status_key">按键</string>
     <string name="phone_status_press">DSH 正在操作 · 按%1$s</string>
     <string name="phone_key_back">返回</string>
@@ -196,6 +197,7 @@
     <string name="phone_confirm_submit">，然后发送 / 提交</string>
     <string name="phone_confirm_tap_xy">在「%1$s」点截图上的位置 (%2$s, %3$s)</string>
     <string name="phone_confirm_gesture">在「%1$s」做手势：%2$s</string>
+    <string name="phone_confirm_input">在「%1$s」按截图上的位置 (%2$s, %3$s) 输入文字</string>
     <string name="phone_confirm_scroll">在「%1$s」滚动</string>
     <string name="phone_confirm_key">按系统键</string>
     <string name="phone_current_app">当前应用</string>
@@ -233,6 +235,7 @@
     <string name="phone_log_scroll">滚动 %1$s %2$s</string>
     <string name="phone_log_tap_xy">点坐标 %1$s (%2$d,%3$d)</string>
     <string name="phone_log_gesture">手势 %1$s</string>
+    <string name="phone_log_input_xy">按坐标输入 %1$d 字 (%2$d, %3$d)</string>
     <string name="phone_log_key">按键 %1$s</string>
     <string name="phone_log_handoff">交还用户</string>
     <string name="phone_log_long_tap">长按 %1$s#%2$d</string>

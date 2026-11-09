@@ -20,6 +20,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import io.github.ccch1mneyyy.dsh_app.phone.ActionResult
 import io.github.ccch1mneyyy.dsh_app.phone.Availability
 import io.github.ccch1mneyyy.dsh_app.phone.CollectResult
+import io.github.ccch1mneyyy.dsh_app.phone.Either
 import io.github.ccch1mneyyy.dsh_app.phone.GesturePlan
 import io.github.ccch1mneyyy.dsh_app.phone.GestureStroke
 import io.github.ccch1mneyyy.dsh_app.phone.PhoneAction
@@ -30,6 +31,7 @@ import io.github.ccch1mneyyy.dsh_app.phone.PhoneScreen
 import io.github.ccch1mneyyy.dsh_app.phone.SafetyRules
 import io.github.ccch1mneyyy.dsh_app.phone.ScreenSnapshot
 import io.github.ccch1mneyyy.dsh_app.phone.TargetInfo
+import io.github.ccch1mneyyy.dsh_app.phone.TextSelector
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -182,6 +184,7 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
                 is PhoneAction.Scroll -> scroll(action, gen)
                 is PhoneAction.TapXY -> tapXY(action, gen)
                 is PhoneAction.Gesture -> gesture(action, gen)
+                is PhoneAction.Input -> input(action, gen)
             }
         }
     }
@@ -541,6 +544,159 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         if (!actuator.gesture(strokes)) return ActionResult(false, "系统没有接受这次手势。", observeQuiet())
         // l10n:keep agent screen result
         return after(before, snap, gen, "已提交截图上的手势。")
+    }
+
+    /**
+     * `tap` by text: the latest snapshot's element whose label, row text or id tail is [text].
+     * A tie is a refusal — the model names one by id — never a guess.
+     */
+    override fun find(screenId: String, text: String): Either<String, Int> {
+        val snap = latest
+        if (snap == null || snap.id != screenId) {
+            val now = observeQuiet()
+            // l10n:keep agent screen result
+            return Either.Left(
+                if (snap == null) "还没有读过屏幕，先用 screen 看一下。"
+                // l10n:keep agent screen result
+                else "屏幕编号 $screenId 过期了（最新 ${now?.id ?: snap.id}），没有操作。按新屏幕上的文字再试。",
+            )
+        }
+        val candidates = snap.screen.elements.map { el ->
+            TextSelector.Candidate(
+                id = el.id,
+                label = el.label,
+                detail = el.fullText,
+                viewId = el.viewId,
+                actionable = el.clickable || el.longClickable || el.editable,
+            )
+        }
+        return when (val hit = TextSelector.pick(text, candidates)) {
+            is TextSelector.Hit.One -> Either.Right(hit.id)
+            is TextSelector.Hit.Fail -> Either.Left(hit.message)
+        }
+    }
+
+    /**
+     * `input`: tap a screenshot point, then write into whatever field that opened. The guards are
+     * [tapXY]'s, in the same order. Inside: the focused editor (SET_TEXT + read-back), then a
+     * 600 ms hold in case the tap only reached a WebView that needs a press, then clipboard +
+     * ACTION_PASTE, then a hold plus the 粘贴 menu item. A password field stops it before any
+     * text is written.
+     */
+    private fun input(a: PhoneAction.Input, gen: Long): ActionResult {
+        val snap = latest
+        if (snap == null || snap.id != a.screenId) {
+            val now = observeQuiet()
+            // l10n:keep agent screen result
+            return ActionResult(false, "屏幕编号 ${a.screenId} 已过期，坐标对不上了。请重新 screen 加 image 再输入。", now)
+        }
+        // l10n:keep agent screen result
+        val geometry = snap.image ?: return ActionResult(false, "屏幕 ${a.screenId} 没有截图。按坐标输入要先用 screen 加 image 拿一张标号截图。")
+        val point = geometry.toScreen(a.x, a.y)
+            // l10n:keep agent screen result
+            ?: return ActionResult(false, "坐标 (${a.x}, ${a.y}) 不在这张截图里（${geometry.width}×${geometry.height}）。")
+        // l10n:keep agent screen result
+        if (snap.ownApp && !lifted.ownApp) return ActionResult(false, "这是 DSH 自己的界面，不操作。")
+        // l10n:keep agent screen result
+        if (snap.protectedPage && !lifted.systemPages) return ActionResult(false, "这是系统权限 / 安全相关页面，DSH 不在这里输入。需要的话请用 handoff 交给用户。")
+        // l10n:keep agent screen result
+        if (snap.hidden || snap.unreadable) return ActionResult(false, "这一屏读不到内容（可能受敏感视图策略限制），不盲输。请 handoff。", observeQuiet())
+        val cap = capture()
+        try {
+            // l10n:keep agent screen result
+            if (unavailable(cap)) return ActionResult(false, "这一屏读不到内容（可能受敏感视图策略限制），不盲输。请 handoff。", toSnapshot(publish(cap, false)))
+            // l10n:keep agent screen result
+            if (!observation(cap).reusableCoordinates(snap.observation)) return ActionResult(false, "无法确认当前界面仍与截图一致，没有输入。请重新看屏幕。", toSnapshot(publish(cap, false)))
+        } finally {
+            cap.recycle()
+        }
+        val before = clock.count
+        // l10n:keep agent screen result
+        if (!actuator.tap(point.first, point.second)) return ActionResult(false, "系统没有接受这次点击，所以没有输入。", observeQuiet())
+        clock.settle(before, 800, 250, 2_500) { cancelled(gen) }
+
+        var wrote = false
+        // l10n:keep agent screen result
+        var refusal: String? = null
+        fun write(editor: AccessibilityNodeInfo): Boolean = try {
+            if (editor.isPassword) {
+                // l10n:keep agent screen result
+                refusal = "焦点落在密码框上，DSH 不替用户填密码。请用 handoff 让用户自己来。"
+                false
+            } else {
+                val got = if (actuator.setText(editor, a.text)) readBack(editor, a.text, gen) else null
+                got != null && sameText(got, a.text)
+            }
+        } finally {
+            editor.recycle()
+        }
+
+        actuator.focusedEditor()?.let { wrote = write(it) }
+        if (!wrote && refusal == null) {
+            // A tap sometimes only reaches the page; a real press opens the field.
+            actuator.hold(point.first, point.second, 600)
+            clock.pause(300) { cancelled(gen) }
+            actuator.focusedEditor()?.let { wrote = write(it) }
+        }
+        if (!wrote && refusal == null && actuator.copy(a.text)) {
+            actuator.focusedEditor()?.let { editor ->
+                try {
+                    if (editor.isPassword) {
+                        // l10n:keep agent screen result
+                        refusal = "焦点落在密码框上，DSH 不替用户填密码。请用 handoff 让用户自己来。"
+                    } else {
+                        val got = if (actuator.paste(editor)) readBack(editor, a.text, gen) else null
+                        wrote = got != null && sameText(got, a.text)
+                    }
+                } finally {
+                    editor.recycle()
+                }
+            }
+            if (!wrote && refusal == null) {
+                // l10n:keep agent screen result
+                actuator.hold(point.first, point.second, 600)
+                clock.pause(400) { cancelled(gen) }
+                // l10n:keep agent screen result
+                if (actuator.clickText("粘贴") || actuator.clickText("Paste")) {
+                    clock.pause(300) { cancelled(gen) }
+                    actuator.focusedEditor()?.let { editor ->
+                        try {
+                            val got = readBack(editor, a.text, gen)
+                            wrote = got != null && sameText(got, a.text)
+                        } finally {
+                            editor.recycle()
+                        }
+                    }
+                }
+            }
+        }
+        refusal?.let { return ActionResult(false, it, observeQuiet()) }
+
+        if (!wrote) {
+            // l10n:keep agent screen result
+            return ActionResult(false, "点了 (${a.x}, ${a.y})，但没有出现能写入的输入框，也没有找到可以粘贴的地方。看看新屏幕，可能要先点一下输入框。", observeQuiet())
+        }
+        if (a.submit) actuator.focusedEditor()?.let { editor ->
+            try {
+                actuator.imeEnter(editor)
+            } finally {
+                editor.recycle()
+            }
+        }
+        // The keyboard covers the next screenshot's coordinates: fold it once the text landed.
+        val keyboard = try {
+            val post = capture()
+            try {
+                observation(post).keyboardShown == true
+            } finally {
+                post.recycle()
+            }
+        } catch (_: Exception) {
+            false
+        }
+        if (keyboard) actuator.global(PhoneAction.GlobalKey.BACK)
+        // l10n:keep agent screen result
+        return after(before, snap, gen, if (a.submit) "已按坐标输入 ${a.text.length} 字并提交。" else "已按坐标输入 ${a.text.length} 字。")
     }
 
     /** Waits for the UI to settle, reads the new screen (`+` marks) and says whether anything changed. */

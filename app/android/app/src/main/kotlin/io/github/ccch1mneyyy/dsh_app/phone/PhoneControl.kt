@@ -69,6 +69,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
             "phone_status_scroll" -> R.string.phone_status_scroll
             "phone_status_tap_xy" -> R.string.phone_status_tap_xy
             "phone_status_gesture" -> R.string.phone_status_gesture
+            "phone_status_input" -> R.string.phone_status_input
             "phone_status_key" -> R.string.phone_status_key
             "phone_status_press" -> R.string.phone_status_press
             "phone_key_back" -> R.string.phone_key_back
@@ -83,6 +84,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
             "phone_confirm_submit" -> R.string.phone_confirm_submit
             "phone_confirm_tap_xy" -> R.string.phone_confirm_tap_xy
             "phone_confirm_gesture" -> R.string.phone_confirm_gesture
+            "phone_confirm_input" -> R.string.phone_confirm_input
             "phone_confirm_scroll" -> R.string.phone_confirm_scroll
             "phone_confirm_key" -> R.string.phone_confirm_key
             "phone_current_app" -> R.string.phone_current_app
@@ -102,6 +104,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
             "phone_log_scroll" -> R.string.phone_log_scroll
             "phone_log_tap_xy" -> R.string.phone_log_tap_xy
             "phone_log_gesture" -> R.string.phone_log_gesture
+            "phone_log_input_xy" -> R.string.phone_log_input_xy
             "phone_log_key" -> R.string.phone_log_key
             "phone_log_handoff" -> R.string.phone_log_handoff
             "phone_log_long_tap" -> R.string.phone_log_long_tap

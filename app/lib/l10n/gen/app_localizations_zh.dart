@@ -9454,6 +9454,9 @@ class L10nZh extends L10n {
   String get phoneToolGesture => '手势';
 
   @override
+  String get phoneToolInput => '按坐标输入';
+
+  @override
   String get phoneToolHandoff => '交还给你';
 
   @override

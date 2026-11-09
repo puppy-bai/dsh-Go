@@ -86,6 +86,22 @@ sealed interface PhoneAction {
         val submit: Boolean = false,
     ) : PhoneAction
 
+    /**
+     * Put [text] into whatever input the point ([x], [y], in the pixel space of the numbered
+     * screenshot [screenId] names) opens: tap it, find the editor the system focused, write, read
+     * back, and fall back to clipboard + 粘贴 when a WebView refuses `ACTION_SET_TEXT`. One call
+     * for what used to be screen → tap → type. Nothing is resolved from the tree, so it is always
+     * confirmed, like [TapXY].
+     */
+    data class Input(
+        override val screenId: String,
+        val x: Int,
+        val y: Int,
+        val text: String,
+        /** Press the IME action / Enter after the text landed. */
+        val submit: Boolean = false,
+    ) : PhoneAction
+
     data class Scroll(override val screenId: String, val elementId: Int?, val direction: Direction) : PhoneAction
 
     data class Key(override val screenId: String, val key: GlobalKey) : PhoneAction
@@ -148,6 +164,18 @@ interface PhoneDriver {
      * (window, bounds, text); the bridge then refuses and re-observes.
      */
     fun target(screenId: String, elementId: Int): TargetInfo?
+
+    /**
+     * The element of the latest snapshot whose text (or id tail) is [text], for `tap` with `text`
+     * instead of an id. Ambiguity is a refusal, never a guess: the model gets the candidate list
+     * and has to name one by id.
+     *
+     * Screens that address elements only (the background mirror) keep this default and answer
+     * with the reason, so callers never have to check which driver they got.
+     */
+    fun find(screenId: String, text: String): Either<String, Int> =
+        // l10n:keep agent tool result
+        Either.Left("这个屏幕不支持按文字找元素，用 id 指定。")
 
     fun perform(action: PhoneAction): ActionResult
 

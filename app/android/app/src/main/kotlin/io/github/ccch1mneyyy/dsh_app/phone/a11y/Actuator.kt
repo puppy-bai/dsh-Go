@@ -7,6 +7,9 @@ package io.github.ccch1mneyyy.dsh_app.phone.a11y
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Path
 import android.graphics.Rect
 import android.os.Build
@@ -142,6 +145,74 @@ internal class Actuator(private val service: AccessibilityService, private val o
         node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
         node.refresh()
         return node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+    }
+
+    /** ACTION_PASTE on the field, when it offers one: a WebView textarea often only takes text this way. */
+    fun paste(node: AccessibilityNodeInfo): Boolean {
+        node.refresh()
+        if (node.actionList.none { it.id == AccessibilityAction.ACTION_PASTE.id }) return false
+        return node.performAction(AccessibilityAction.ACTION_PASTE.id)
+    }
+
+    /** Puts [text] on the system clipboard, for the paste fallback. */
+    fun copy(text: String): Boolean = try {
+        val cm = service.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return false
+        cm.setPrimaryClip(ClipData.newPlainText("dsh", text))
+        true
+    } catch (_: Exception) {
+        false
+    }
+
+    /** Holds a point for [ms]: the fallback that opens a WebView's 粘贴 menu when no node answers. */
+    fun hold(x: Int, y: Int, ms: Long): Boolean {
+        val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
+        return gesture(GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, ms)).build(), ms)
+    }
+
+    /** The editable field the system has input focus on right now, across every window. */
+    fun focusedEditor(): AccessibilityNodeInfo? {
+        for (window in windows()) {
+            val root = window.root ?: continue
+            val found = try {
+                root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+            } catch (_: Exception) {
+                null
+            } finally {
+                root.recycle()
+            }
+            if (found == null) continue
+            if (found.isEditable) return found
+            found.recycle()
+        }
+        return null
+    }
+
+    /** Clicks the first clickable node whose text is [text] anywhere on screen (the 粘贴 menu item). */
+    fun clickText(text: String): Boolean {
+        for (window in windows()) {
+            val root = window.root ?: continue
+            val hits = try {
+                root.findAccessibilityNodeInfosByText(text)
+            } catch (_: Exception) {
+                null
+            } finally {
+                root.recycle()
+            }
+            if (hits.isNullOrEmpty()) continue
+            var clicked = false
+            for (node in hits) {
+                if (!clicked && node.isEnabled && node.isClickable) clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                node.recycle()
+            }
+            if (clicked) return true
+        }
+        return false
+    }
+
+    private fun windows() = try {
+        service.windows
+    } catch (_: Exception) {
+        emptyList<android.view.accessibility.AccessibilityWindowInfo>()
     }
 
     /** The keyboard's action key (搜索 / 发送 / 完成): API 30+ only. */

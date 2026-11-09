@@ -22,6 +22,7 @@ object PhoneToolCatalog {
     const val KEY = "key"
     const val TAP_XY = "tap_xy"
     const val GESTURE = "gesture"
+    const val INPUT = "input"
     const val HANDOFF = "handoff"
 
     class Tool(val name: String, val description: String, val properties: Map<String, Any?>, val required: List<String>) {
@@ -159,12 +160,14 @@ object PhoneToolCatalog {
         Tool(
             SCREEN,
             // l10n:keep agent tool catalog
-            "读当前屏幕：每行一个元素，[编号] 只在本屏有效。detail:true 附坐标；image:true 附标号截图；background:true 读后台屏。",
+            "读当前屏幕：每行一个元素，[编号] 只在本屏有效。detail:true 附元素边界（左上-右下）；image:true 附标号截图；until 是等这段文字出现再返回；background:true 读后台屏。",
             linkedMapOf(
                 // l10n:keep agent tool catalog
-                "detail" to bool("附上元素坐标"),
+                "detail" to bool("附上元素边界（左上-右下）"),
                 // l10n:keep agent tool catalog
                 "image" to bool("附带标号截图"),
+                // l10n:keep agent tool catalog
+                "until" to str("等这段文字出现再返回（可选，最多 5 秒）"),
                 // l10n:keep agent tool catalog
                 "background" to bool("读后台屏（不打扰模式）"),
             ),
@@ -188,10 +191,17 @@ object PhoneToolCatalog {
         Tool(
             TAP,
             // l10n:keep agent tool catalog
-            "点一个元素，返回新屏幕。敏感按钮或首次操作该 App 会先请用户确认。",
-            // l10n:keep agent tool catalog
-            linkedMapOf("screen" to SCREEN_ID, "id" to int("元素编号"), "long" to bool("长按")),
-            listOf("screen", "id"),
+            "点一个元素，返回新屏幕。id 和 text 二选一：text 是界面上看得见的文字，按它找元素（匹配到多个会拒绝，列出候选让你用 id 指定）。敏感按钮或首次操作该 App 会先请用户确认。",
+            linkedMapOf(
+                "screen" to SCREEN_ID,
+                // l10n:keep agent tool catalog
+                "id" to int("元素编号（与 text 二选一）"),
+                // l10n:keep agent tool catalog
+                "text" to str("按钮/条目上的文字，按名字点（与 id 二选一）"),
+                // l10n:keep agent tool catalog
+                "long" to bool("长按"),
+            ),
+            listOf("screen"),
         ),
         Tool(
             TYPE,
@@ -209,6 +219,24 @@ object PhoneToolCatalog {
             listOf("screen", "id", "text"),
         ),
         Tool(
+            INPUT,
+            // l10n:keep agent tool catalog
+            "一个调用完成「点输入框 → 写入 → 回读 → 收键盘」：按标号截图的像素坐标 x,y 点一下，把文字写进弹出的输入框；WebView 不认时自动改用剪贴板 + 粘贴。替代 screen + tap + type 三步。坐标取最近一次 screen 的标号截图（先 screen 加 image）。返回新屏幕。密码框会拒绝，每次都要用户确认。",
+            linkedMapOf(
+                // l10n:keep agent tool catalog
+                "observation" to str("那张标号截图的屏幕号"),
+                // l10n:keep agent tool catalog
+                "x" to int("输入框的横坐标（截图像素，从 0 开始）"),
+                // l10n:keep agent tool catalog
+                "y" to int("输入框的纵坐标（截图像素，从 0 开始）"),
+                // l10n:keep agent tool catalog
+                "text" to str("要填入的文字"),
+                // l10n:keep agent tool catalog
+                "submit" to bool("写入后按回车 / 发送"),
+            ),
+            listOf("observation", "x", "y", "text"),
+        ),
+        Tool(
             SCROLL,
             // l10n:keep agent tool catalog
             "滚动，返回新屏幕。id 是要滚动的列表，省略时滚主列表。",
@@ -218,6 +246,10 @@ object PhoneToolCatalog {
                 "id" to int("列表编号，可省略"),
                 // l10n:keep agent tool catalog
                 "direction" to enum(DIRECTIONS, "方向"),
+                // l10n:keep agent tool catalog
+                "until" to str("一直往这个方向滚，直到出现这段文字（最多 max 次）"),
+                // l10n:keep agent tool catalog
+                "max" to int("until 最多滚几次（1–20，默认 10）"),
             ),
             listOf("screen", "direction"),
         ),
@@ -289,5 +321,5 @@ object PhoneToolCatalog {
     fun listJson(): List<Map<String, Any?>> = tools.map { it.toJson() }
 
     /** Tools that act on a screen through a [PhoneDriver] (need accessibility or the background display). */
-    val SCREEN_TOOLS = setOf(SCREEN, COLLECT, TAP, TYPE, SCROLL, KEY, TAP_XY, GESTURE, HANDOFF)
+    val SCREEN_TOOLS = setOf(SCREEN, COLLECT, TAP, TYPE, SCROLL, KEY, TAP_XY, GESTURE, INPUT, HANDOFF)
 }

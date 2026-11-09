@@ -5,12 +5,14 @@ import android.os.Bundle
 import io.github.ccch1mneyyy.dsh_app.phone.ActionResult
 import io.github.ccch1mneyyy.dsh_app.phone.Availability
 import io.github.ccch1mneyyy.dsh_app.phone.CollectResult
+import io.github.ccch1mneyyy.dsh_app.phone.Either
 import io.github.ccch1mneyyy.dsh_app.phone.PhoneAction
 import io.github.ccch1mneyyy.dsh_app.phone.PhoneDriver
 import io.github.ccch1mneyyy.dsh_app.phone.PhoneRegistry
 import io.github.ccch1mneyyy.dsh_app.phone.PhoneScreen
 import io.github.ccch1mneyyy.dsh_app.phone.ScreenSnapshot
 import io.github.ccch1mneyyy.dsh_app.phone.TargetInfo
+import io.github.ccch1mneyyy.dsh_app.phone.TextSelector
 
 /**
  * BACKGROUND [PhoneDriver] (screen ids `b<n>`): reads and drives the trusted virtual display
@@ -118,6 +120,26 @@ class BackgroundDisplay(
         return CollectResult(seen.toList(), pages, stop, last)
     }
 
+    /** `tap` by text on the background screen: same rule as the main screen, over its last snapshot. */
+    override fun find(screenId: String, text: String): Either<String, Int> {
+        if (screenId != lastScreenId) {
+            // l10n:keep agent screen protocol
+            return Either.Left("后台屏的屏幕号过期了，先重新 screen 再按文字点。")
+        }
+        val candidates = lastElements.map { e ->
+            TextSelector.Candidate(
+                id = e.id,
+                label = e.label,
+                viewId = e.viewId,
+                actionable = e.isEditable || e.role in setOf("按钮", "链接", "输入框", "开关", "勾选框", "标签"),
+            )
+        }
+        return when (val hit = TextSelector.pick(text, candidates)) {
+            is TextSelector.Hit.One -> Either.Right(hit.id)
+            is TextSelector.Hit.Fail -> Either.Left(hit.message)
+        }
+    }
+
     override fun target(screenId: String, elementId: Int): TargetInfo? {
         if (screenId != lastScreenId) return null
         val e = lastElements.getOrNull(elementId - 1) ?: return null
@@ -181,6 +203,7 @@ class BackgroundDisplay(
             // l10n:keep agent screen protocol
             is PhoneAction.TapXY -> return ActionResult(false, "后台屏按元素编号操作，不用坐标")
             is PhoneAction.Gesture -> return ActionResult(false, "后台屏按元素编号操作，不用坐标")
+            is PhoneAction.Input -> return ActionResult(false, "后台屏按元素编号操作，不用坐标")
         }
         // l10n:keep agent screen protocol
         val active = channel()

@@ -17462,6 +17462,12 @@ abstract class L10n {
   /// **'手势'**
   String get phoneToolGesture;
 
+  /// No description provided for @phoneToolInput.
+  ///
+  /// In zh, this message translates to:
+  /// **'按坐标输入'**
+  String get phoneToolInput;
+
   /// No description provided for @phoneToolHandoff.
   ///
   /// In zh, this message translates to:
