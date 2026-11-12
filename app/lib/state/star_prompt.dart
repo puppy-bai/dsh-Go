@@ -18,7 +18,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../phone/phone_channel.dart' show PhoneTaskStatus;
 import '../pets/pet_signals.dart' show petFocusProvider, petPendingProvider;
-import '../update/update_config.dart' show updateRepo;
 import 'draft_store.dart';
 import 'notify_state.dart' show appForegroundProvider, chatOnScreenProvider;
 import 'phone_state.dart' show phoneChannelProvider;
@@ -31,9 +30,9 @@ const starPromptEnabled = bool.fromEnvironment('DSH_STAR_PROMPT');
 /// The switch as the app reads it (tests turn it on).
 final starPromptGateProvider = Provider<bool>((ref) => starPromptEnabled);
 
-/// Where 「去 GitHub 点 Star」 goes: the public repository's page (its releases
-/// are the app's updates).
-final starProjectPage = Uri.https('github.com', '/$updateRepo');
+/// Where 「去 GitHub 点 Star」 goes: credit the original project independently
+/// of the community fork's update source.
+final starProjectPage = Uri.https('github.com', '/ccch1mneyyy/dsh-go');
 
 /// The numbers behind the prompt, with their reasons in the design note.
 abstract final class StarPromptRules {

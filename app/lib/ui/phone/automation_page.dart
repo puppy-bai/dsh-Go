@@ -410,7 +410,7 @@ class _PhoneAutomationPageState extends State<PhoneAutomationPage> with WidgetsB
                                 cacheWidth: 240,
                                 fit: BoxFit.cover,
                                 errorBuilder: (_, _, _) =>
-                                    const SizedBox(height: 112, child: Icon(Icons.broken_image_outlined)),
+              const SizedBox(height: 112, child: Icon(AppIcons.imageBroken)),
                               ),
                               Text('${item['name'] ?? item['runId']}', maxLines: 2, overflow: TextOverflow.ellipsis),
                             ],
