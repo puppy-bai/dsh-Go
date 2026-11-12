@@ -2,6 +2,18 @@
 
 每个版本先中文、后英文。发版时把对应版本的正文（不含版本标题）作为 Release 正文，见 `docs/release.md`。
 
+## 1.0.18 · 2026-11-12
+
+### 中文
+
+- 修复 Android 正则引擎不接受未转义的结尾花括号，导致自动任务解析器初始化失败、任务页和全局自动模式开关显示混淆类名（1.0.17 中为 `i5`）的问题。
+- 增加参数替换回归测试及独立缓存目录中的 Android 开关持久化、授权校验和任务保存测试，不修改现有任务与授权数据格式。
+
+### English
+
+- Escape the literal closing brace in task parameter references for Android's regex engine. The invalid pattern prevented the task parser from initializing and exposed its obfuscated class name (`i5` in 1.0.17) on the task page and global automatic mode switch.
+- Add parameter substitution regression coverage and isolated Android tests for switch persistence, authorization checks and task preservation. Existing task and authorization data formats are unchanged.
+
 ## 1.0.17 · 2026-11-12 候选 / Candidate
 
 ### 中文

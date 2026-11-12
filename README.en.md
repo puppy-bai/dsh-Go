@@ -2,7 +2,7 @@
   <a href="README.md">简体中文</a> · <b>English</b>
 </p>
 
-> **1.0.17 automation candidate** adds local conditions, bounded loops, one-time runs, reviewed task saving and parameter reuse, plus optional local screenshot evidence. See the [saved task guide](docs/guide/en/04-phone-control.md#saved-phone-tasks) and [candidate changelog](docs/changelog.md#1017--2026-11-12-候选--candidate). This work did not install the app or validate it on a real phone.
+> **Recommended version: 1.0.18.** It fixes an Android initialization failure in the automation parser that made global automatic mode display `i5` in 1.0.17. Download the arm64 APK from [GitHub Releases](../../releases/latest). Version 1.0.17 is marked as a prerelease and is not recommended for installation.
 
 <p align="center">
   <picture>
@@ -26,10 +26,8 @@
 > under AGPL-3.0. Upstream is [ccch1mneyyy/dsh-go](https://github.com/ccch1mneyyy/dsh-go), by
 > [ccch1mneyyy](https://github.com/ccch1mneyyy).
 >
-> **Install:** 1.0.16 is a local build delivery for arm64 and Android 8.0+ (screenshots require Android 11+).
-> A community build with the same signing key can be upgraded in place, keeping data. A differently
-> signed upstream APK cannot be replaced directly; never automatically uninstall it after an install failure.
-> See the [routine contract](docs/phone-routines-en.md) and the delivery's actual validation report.
+> **Install:** Version 1.0.18 is arm64 for Android 8.0+ (accessibility screenshots require Android 11+).
+> A community build signed with the same key can be upgraded in place. Android cannot replace an app with a differently signed APK. If installation fails, do not uninstall the current app; that clears chats, settings, plugins and the local runtime.
 
 <p align="center">
   <a href="../../releases/latest"><img alt="Android 8+" src="https://img.shields.io/badge/Android-8%2B-4B67B4?style=flat-square&logo=android&logoColor=white&labelColor=2B3245"></a>

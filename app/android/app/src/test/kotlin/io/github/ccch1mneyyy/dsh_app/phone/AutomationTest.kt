@@ -72,6 +72,16 @@ class AutomationTest {
         invalid { p.bind(mapOf("budget" to 20, "unknown" to true)) }
     }
 
+    @Test fun referencesPreserveTypesAndOnlyReplaceCompleteNamedPlaceholders() {
+        val values = mapOf("recipient" to "测试联系人", "count" to 3)
+        assertEquals(3, AutomationPlan.substitute("\${count}", values))
+        assertEquals("发给测试联系人，共3次", AutomationPlan.substitute("发给\${recipient}，共\${count}次", values))
+        for (literal in listOf("}", "{recipient}", "\${recipient", "\${9count}")) {
+            assertEquals(literal, AutomationPlan.substitute(literal, values))
+        }
+        invalid { AutomationPlan.substitute("\${unknown}", values) }
+    }
+
     @Test fun storeApprovalsPersistAndNeverMutateRunningDefinition() {
         val dir = Files.createTempDirectory("automation-store").toFile()
         val store = AutomationStore(dir)

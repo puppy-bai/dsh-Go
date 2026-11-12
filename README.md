@@ -2,7 +2,7 @@
   <b>简体中文</b> · <a href="README.en.md">English</a>
 </p>
 
-> **1.0.17 自动任务候选版**：新增本地条件分支、有限循环、临时运行、审核保存与参数复用，以及可选的本机截图证据。详见[自动任务指南](docs/guide/zh/04-phone-control.md#自动任务保存和重复运行)和[候选版更新记录](docs/changelog.md#1017--2026-11-12-候选--candidate)。本次未安装或进行真机验收。
+> **当前推荐版：1.0.18**。修复 1.0.17 在 Android 上初始化自动任务解析器失败、全局自动模式显示 `i5` 的问题。请从 [GitHub Releases](../../releases/latest) 下载 arm64 APK。1.0.17 已标为预发布版，不建议安装。
 
 <p align="center">
   <picture>
@@ -23,9 +23,8 @@
 上游不接受外部 PR，所以本仓库独立维护；
 详见<a href="#gesture">坐标手势</a>与 <a href="docs/gesture-zh.md">docs/gesture-zh.md</a>。
 主仓库 <a href="https://github.com/ccch1mneyyy/dsh-go">ccch1mneyyy/dsh-go</a>、原作者 <a href="https://github.com/ccch1mneyyy">ccch1mneyyy</a>。本项目及其改动按 AGPL-3.0 发布，改动部分同样开源。</p>
-<p><b>安装</b>：1.0.16 为本地构建交付，arm64、Android 8.0+；无障碍截图需要 Android 11+。
-同一签名的社区版可覆盖升级保留数据；与上游版签名不同不能覆盖，不要让安装脚本自动卸载旧版。
-先读<a href="docs/phone-routines-plan-zh.md">本轮方案</a>及交付包内的实际验证记录。</p>
+<p><b>安装</b>：1.0.18 为 arm64 版，适用于 Android 8.0+；无障碍截图需要 Android 11+。
+同一签名的社区版可覆盖升级保留数据。Android 不允许跨签名覆盖；安装失败时不要卸载当前版本，以免清除对话、设置、插件及本机运行环境。</p>
 </blockquote>
 
 <p align="center">

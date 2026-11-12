@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.Instrumentation
 import android.os.Bundle
 import android.os.SystemClock
+import java.io.File
+import java.nio.file.Files
 
 /** Test APK only: operates the public phone core against the explicitly opened local fixture. */
 class PhoneLabInstrumentation : Instrumentation() {
@@ -19,6 +21,10 @@ class PhoneLabInstrumentation : Instrumentation() {
     }
 
     override fun onStart() {
+        if (options.getString("case") == "automationStore") {
+            exerciseAutomationStore()
+            return
+        }
         val results = Bundle()
         var passed = 0
         var failed = 0
@@ -62,6 +68,64 @@ class PhoneLabInstrumentation : Instrumentation() {
             results.putInt("passed", passed)
             results.putInt("failed", failed)
             finish(if (failed == 0) Activity.RESULT_OK else Activity.RESULT_CANCELED, results)
+        }
+    }
+
+    /** Runs on Android's regex/filesystem implementation without opening apps or real task data. */
+    private fun exerciseAutomationStore() {
+        val results = Bundle()
+        var directory: File? = null
+        var failure: String? = null
+        fun expect(value: Boolean, code: String) { if (!value) throw LabFailure(code) }
+        try {
+            val isolated = Files.createTempDirectory(targetContext.cacheDir.toPath(), "automation-store-lab-").toFile()
+            directory = isolated
+            val service = AutomationService(isolated, { _, _ -> throw LabFailure("unexpected-action") })
+            val initial = service.request("list")
+            expect(initial["ok"] == true && initial["globalAuto"] == false && initial["storeError"] == null, "initial-list")
+            val denied = service.request("set_auto", mapOf("enabled" to true))
+            expect(denied["ok"] == false && denied["reason"] == "user-approval-required", "untrusted-enable")
+            expect(service.request("status")["globalAuto"] == false, "untrusted-state-mutated")
+
+            val definition = mapOf<String, Any?>(
+                "schema" to 1, "id" to "android-store-lab", "name" to "Android store lab",
+                "apps" to listOf("example.app"), "steps" to listOf(mapOf("op" to "finish", "result" to "done")),
+            )
+            val proposal = service.request("propose", mapOf("definition" to definition))
+            expect(proposal["ok"] == true, "propose")
+            val approved = service.request("approve", mapOf("proposalId" to proposal["proposalId"], "authorization" to "each"), trusted = true)
+            expect(approved["ok"] == true, "approve")
+            val saved = AutomationStore(isolated).get("android-store-lab")
+
+            val enabled = service.request("set_auto", mapOf("enabled" to true), trusted = true)
+            expect(enabled["ok"] == true && enabled["globalAuto"] == true, "trusted-enable")
+            expect(AutomationStore(isolated).globalAuto(), "enabled-not-persisted")
+            val disabled = service.request("set_auto", mapOf("enabled" to false), trusted = true)
+            expect(disabled["ok"] == true && disabled["globalAuto"] == false, "trusted-disable")
+            val reloaded = AutomationStore(isolated)
+            expect(reloaded.loadError == null && !reloaded.globalAuto(), "disabled-not-persisted")
+            expect(reloaded.get("android-store-lab") == saved && reloaded.proposals().isEmpty(), "task-not-preserved")
+            expect(!service.isRunning, "unexpected-run")
+
+            val values = mapOf("message" to "你好", "count" to 7)
+            expect(AutomationPlan.substitute("消息：\${message}；次数：\${count}", values) == "消息：你好；次数：7", "embedded-substitution")
+            expect(AutomationPlan.substitute("\${count}", values) == 7, "typed-substitution")
+            for (literal in listOf("普通 {括号}", "\${}", "\${123}", "\${message", "\$message}")) {
+                expect(AutomationPlan.substitute(literal, values) == literal, "literal-substitution")
+            }
+            try {
+                AutomationPlan.substitute("\${unknown}", values)
+                throw LabFailure("unknown-variable-accepted")
+            } catch (_: IllegalArgumentException) {}
+            results.putString("automationStore", "PASS")
+        } catch (e: Throwable) {
+            failure = if (e is LabFailure) e.code else e.javaClass.simpleName
+            results.putString("setup", failure)
+        } finally {
+            directory?.deleteRecursively()
+            results.putInt("passed", if (failure == null) 1 else 0)
+            results.putInt("failed", if (failure == null) 0 else 1)
+            finish(if (failure == null) Activity.RESULT_OK else Activity.RESULT_CANCELED, results)
         }
     }
 

@@ -46,7 +46,8 @@ class AutomationPlan private constructor(
         val PRIMITIVES = setOf("open", "tap", "type", "scroll", "key", "observe", "read_text", "plugin", "tap_xy", "input")
         val OPS = PRIMITIVES + setOf("snapshot", "assert", "wait", "if", "repeat", "set", "ai", "finish", "break")
         private val variable = Regex("[A-Za-z][A-Za-z0-9_]{0,63}")
-        private val reference = Regex("\\$\\{([A-Za-z][A-Za-z0-9_]*)}")
+        // Android ICU requires literal closing braces to be escaped too.
+        private val reference = Regex("\\$\\{([A-Za-z][A-Za-z0-9_]*)\\}")
 
         @Suppress("UNCHECKED_CAST")
         fun parse(input: Map<String, Any?>): AutomationPlan {
