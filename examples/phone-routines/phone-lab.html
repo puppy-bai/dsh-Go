@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DSH 手机操控验收页</title>
+  <style>
+    :root { color-scheme: light; font: 17px/1.65 system-ui,sans-serif; color:#17243d; background:#f2f5fa; }
+    * { box-sizing:border-box; } body { margin:0 auto; max-width:760px; padding:20px 16px 60px; }
+    h1 { font-size:1.55rem; margin:0 0 10px; } h2 { font-size:1.2rem; margin-top:0; }
+    section { background:white; padding:20px; margin:18px 0; border:1px solid #d9e1ef; border-radius:16px; scroll-margin-top:60px; }
+    .fixture-marker { position:sticky; top:0; z-index:2; background:#fff8db; border:1px solid #dbc365; border-radius:8px; padding:6px 12px; margin-bottom:14px; }
+    nav { display:flex; flex-wrap:wrap; gap:10px 20px; } a { color:#174c9e; }
+    label { display:block; margin:12px 0 5px; font-weight:600; }
+    input,textarea,button,select { font:inherit; max-width:100%; }
+    input,textarea,select { width:100%; border:1px solid #8b9bb3; border-radius:8px; padding:11px; background:white; color:inherit; }
+    textarea { min-height:90px; resize:vertical; } button { min-height:48px; border:0; border-radius:9px; margin:12px 8px 0 0; padding:10px 16px; background:#164e9d; color:white; cursor:pointer; }
+    button.secondary { background:#e7eef9; color:#173b73; } button:disabled { background:#8c99ac; }
+    :focus-visible { outline:3px solid #e39316; outline-offset:3px; }
+    .note { color:#4d5f79; font-size:.93rem; } .result { min-height:28px; padding-top:12px; overflow-wrap:anywhere; }
+    .list { height:300px; overflow-y:auto; border:1px solid #adbcd3; border-radius:8px; padding:0 12px; }
+    .list p { padding:12px 0; border-bottom:1px solid #dce4ef; margin:0; }
+    .messages { background:#eef3fa; padding:12px; border-radius:9px; } .messages p { margin:8px 0; }
+  </style>
+</head>
+<body>
+  <div class="fixture-marker" role="note">手机操控测试场</div>
+  <h1>DSH 手机操控验收页</h1>
+  <p class="note">只使用虚构测试数据。消息、签到和答案只在当前页面内处理，刷新即清空；不连接任何真实平台。</p>
+  <nav aria-label="测试项目导航">
+    <a href="#form">输入与表单</a><a href="#delay">页面等待</a><a href="#scroll">连续滚动</a><a href="#chat">模拟消息</a><a href="#checkin">模拟签到</a><a href="#quiz">练习题</a>
+  </nav>
+
+  <section id="form" aria-labelledby="form-title">
+    <h2 id="form-title">一、原生输入与多字段表单</h2>
+    <form id="profile-form">
+      <label for="person-name">姓名输入框</label><input id="person-name" name="personName" type="text" autocomplete="off" aria-label="姓名输入框">
+      <label for="city-name">城市输入框</label><input id="city-name" name="city" type="text" autocomplete="off" aria-label="城市输入框">
+      <label for="study-goal">学习目标输入框</label><textarea id="study-goal" name="goal" aria-label="学习目标输入框"></textarea>
+      <button type="submit">保存测试表单</button><button type="button" class="secondary" id="clear-form">清空测试表单</button>
+    </form>
+    <div id="form-result" class="result" role="status" aria-live="polite">表单尚未保存</div>
+  </section>
+
+  <section id="delay" aria-labelledby="delay-title">
+    <h2 id="delay-title">二、等待页面变化</h2>
+    <p>点开始后，测试按钮会在 3 秒后出现。可以验证等待成功与等待不存在文字的超时。</p>
+    <button id="start-delay">开始三秒等待</button>
+    <button id="delayed-button" hidden>延迟测试按钮</button>
+    <div id="delay-result" class="result" role="status" aria-live="polite">等待尚未开始</div>
+  </section>
+
+  <section id="scroll" aria-labelledby="scroll-title">
+    <h2 id="scroll-title">三、长列表</h2>
+    <p>列表内有 40 条记录，请滚到第 31 条核对目标。列表可独立滚动，勿把页面滚动当成列表已滚动。</p>
+    <div id="long-list" class="list" tabindex="0" role="region" aria-label="四十条测试记录列表"></div>
+    <button id="reset-list" class="secondary">重置列表到顶部</button>
+  </section>
+
+  <section id="chat" aria-labelledby="chat-title">
+    <h2 id="chat-title">四、模拟消息</h2>
+    <p><strong>当前联系人：测试同学小鲸</strong></p>
+    <div id="messages" class="messages" role="log" aria-live="polite"><p>测试同学小鲸：明天几点讨论学习计划？</p></div>
+    <label for="chat-draft">测试聊天输入框</label><textarea id="chat-draft" aria-label="测试聊天输入框"></textarea>
+    <button id="send-message">发送测试消息</button><button id="clear-chat" class="secondary">重置模拟消息</button>
+    <div id="chat-result" class="result" role="status" aria-live="polite">测试消息尚未发送</div>
+  </section>
+
+  <section id="checkin" aria-labelledby="checkin-title">
+    <h2 id="checkin-title">五、模拟每日签到</h2>
+    <div id="checkin-result" class="result" role="status" aria-live="polite">今日未签到</div>
+    <button id="checkin-button">完成测试签到</button><button id="reset-checkin" class="secondary">重置测试签到</button>
+  </section>
+
+  <section id="quiz" aria-labelledby="quiz-title">
+    <h2 id="quiz-title">六、三道练习题</h2>
+    <form id="quiz-form">
+      <label for="answer-one">第一题答案：7 加 5 等于多少？</label><input id="answer-one" aria-label="第一题答案输入框" type="text" inputmode="numeric" autocomplete="off">
+      <label for="answer-two">第二题答案：三角形有几条边？</label><input id="answer-two" aria-label="第二题答案输入框" type="text" inputmode="numeric" autocomplete="off">
+      <label for="answer-three">第三题答案：水在一个标准大气压下的沸点是多少摄氏度？</label><input id="answer-three" aria-label="第三题答案输入框" type="text" inputmode="numeric" autocomplete="off">
+      <button type="submit">检查练习答案</button><button type="button" id="clear-quiz" class="secondary">重置练习题</button>
+    </form>
+    <div id="quiz-result" class="result" role="status" aria-live="polite">练习尚未检查</div>
+  </section>
+
+  <script>
+    'use strict';
+    const byId = id => document.getElementById(id);
+    let delayTimer;
+    let checkedIn = false;
+    let messageCount = 0;
+    function saveProfile(event) {
+      event.preventDefault();
+      const values = ['person-name', 'city-name', 'study-goal'].map(id => byId(id).value.trim());
+      byId('form-result').textContent = values.some(value => !value)
+        ? '表单未保存：请填完姓名、城市和学习目标'
+        : `表单已保存：姓名 ${values[0]}；城市 ${values[1]}；学习目标 ${values[2]}`;
+    }
+    function startDelay() {
+      clearTimeout(delayTimer);
+      byId('delayed-button').hidden = true;
+      byId('delay-result').textContent = '正在等待，三秒后显示按钮';
+      delayTimer = setTimeout(() => {
+        byId('delayed-button').hidden = false;
+        byId('delay-result').textContent = '延迟按钮已出现';
+      }, 3000);
+    }
+    function sendMessage() {
+      const text = byId('chat-draft').value.trim();
+      if (!text) { byId('chat-result').textContent = '未发送：草稿为空'; return; }
+      const bubble = document.createElement('p');
+      bubble.textContent = `我：${text}`;
+      byId('messages').append(bubble);
+      messageCount += 1;
+      byId('chat-draft').value = '';
+      byId('chat-result').textContent = `已发送 ${messageCount} 条测试消息；联系人：测试同学小鲸`;
+    }
+    function checkIn() {
+      if (checkedIn) { byId('checkin-result').textContent = '今日已签到，无需重复'; return; }
+      checkedIn = true;
+      byId('checkin-result').textContent = '签到成功：今日已签到，累计测试签到 1 次';
+      byId('checkin-button').disabled = true;
+    }
+    function checkQuiz(event) {
+      event.preventDefault();
+      const values = ['answer-one', 'answer-two', 'answer-three'].map(id => byId(id).value.trim());
+      const answers = ['12', '3', '100'];
+      const correct = values.filter((value, index) => value === answers[index]).length;
+      const details = values.map((value, index) => `第${index + 1}题${value === answers[index] ? '正确' : '错误'}`).join('；');
+      byId('quiz-result').textContent = `练习已检查：答对 ${correct}/3 题。${details}`;
+    }
+    byId('profile-form').addEventListener('submit', saveProfile);
+    byId('clear-form').addEventListener('click', () => { byId('profile-form').reset(); byId('form-result').textContent = '表单尚未保存'; });
+    byId('start-delay').addEventListener('click', startDelay);
+    byId('delayed-button').addEventListener('click', () => { byId('delay-result').textContent = '延迟按钮已点击'; });
+    for (let i = 1; i <= 40; i += 1) {
+      const row = document.createElement('p');
+      row.textContent = `测试记录 ${String(i).padStart(2, '0')}${i === 31 ? '：目标蓝鲸' : '：日常练习条目'}`;
+      byId('long-list').append(row);
+    }
+    byId('reset-list').addEventListener('click', () => { byId('long-list').scrollTop = 0; });
+    byId('send-message').addEventListener('click', sendMessage);
+    byId('clear-chat').addEventListener('click', () => {
+      byId('messages').textContent = '测试同学小鲸：明天几点讨论学习计划？';
+      byId('chat-draft').value = ''; messageCount = 0; byId('chat-result').textContent = '测试消息尚未发送';
+    });
+    byId('checkin-button').addEventListener('click', checkIn);
+    byId('reset-checkin').addEventListener('click', () => { checkedIn = false; byId('checkin-button').disabled = false; byId('checkin-result').textContent = '今日未签到'; });
+    byId('quiz-form').addEventListener('submit', checkQuiz);
+    byId('clear-quiz').addEventListener('click', () => { byId('quiz-form').reset(); byId('quiz-result').textContent = '练习尚未检查'; });
+  </script>
+</body>
+</html>

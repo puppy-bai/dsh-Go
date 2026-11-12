@@ -163,6 +163,7 @@ class PhoneCore(
             PhoneToolCatalog.CLIPBOARD -> clipboard(a, owner)
             PhoneToolCatalog.SCREEN -> screen(a, owner)
             PhoneToolCatalog.COLLECT -> collect(a, owner)
+            PhoneToolCatalog.RUN -> routine(a, scope, owner)
             PhoneToolCatalog.TAP -> if (a.int("id") == null) tapByText(a, scope, owner) else act(name, a, scope, owner)
             PhoneToolCatalog.SCROLL -> if (a.str("until") != null) scrollUntil(a, scope, owner) else act(name, a, scope, owner)
             PhoneToolCatalog.TYPE, PhoneToolCatalog.TAP_XY, PhoneToolCatalog.GESTURE, PhoneToolCatalog.INPUT -> act(name, a, scope, owner)
@@ -417,32 +418,59 @@ class PhoneCore(
         if (!current(owner)) return stoppedOut(summary)
         val detail = a.bool("detail") == true
         val image = a.bool("image") == true
-        var snap = driver.observe(detail = detail, image = image)
-        // `until`: the page often draws after the screen was read; watch it for a moment instead of
-        // making the model poll with more calls (the same idea as collect's until).
-        a.str("until")?.let { until ->
-            val deadline = System.currentTimeMillis() + 5_000
-            while (!snap.text.contains(until) && System.currentTimeMillis() < deadline && current(owner)) {
-                try {
-                    Thread.sleep(250)
-                } catch (_: InterruptedException) {
-                    return stoppedOut(summary)
-                }
-                snap = driver.observe(detail = detail, image = image)
+        val until = a.str("until")
+        fun observe(withImage: Boolean): Out {
+            if (!current(owner)) return stoppedOut(summary)
+            if (env.isLocked()) return locked(summary)
+            when (val d = driverFor(which)) {
+                is Either.Left -> return Out(d.value, error = true, summary = summary, decision = "unavailable")
+                is Either.Right -> Unit
             }
+            val pkg = driver.foregroundPackage()
+            safety.checkRead(pkg, null)?.let {
+                return Out(it.message, error = true, app = pkg, summary = summary, decision = "refused:${it.rule}")
+            }
+            if (!current(owner)) return stoppedOut(summary)
+            if (env.isLocked()) return locked(summary)
+            val snap = driver.observe(detail = detail, image = withImage)
+            if (!current(owner) || !tasks.setAppIfCurrent(owner, snap.appLabel)) return stoppedOut(summary)
+            if (env.isLocked()) return locked(summary)
+            val shown = safety.filterScreen(snap)
+            if (!current(owner)) return stoppedOut(summary)
+            val refused = shown !== snap
+            return Out(
+                // l10n:keep agent tool result
+                if (refused) "没有读取这个屏幕的内容。" else "",
+                error = refused,
+                screen = shown,
+                app = snap.appLabel ?: snap.packageName,
+                summary = "$summary ${snap.id}",
+                decision = if (refused) "refused:read" else "ok",
+            )
         }
-        if (!current(owner) || !tasks.setAppIfCurrent(owner, snap.appLabel)) return stoppedOut(summary)
-        val shown = safety.filterScreen(snap)
-        if (!current(owner)) return stoppedOut(summary)
-        val refused = shown !== snap
+        var out = observe(image && until == null)
+        if (out.error || until == null) return out
+        val deadline = System.nanoTime() + 5_000_000_000L
+        var polls = 0
+        while (!out.screen!!.text.contains(until) && polls++ < 20 && System.nanoTime() < deadline) {
+            env.sleep(250)
+            out = observe(false)
+            if (out.error) return out
+        }
+        // Poll the text only; a screenshot is taken once, after waiting has finished.
+        if (image) {
+            out = observe(true)
+            if (out.error) return out
+        }
+        val missing = !out.screen!!.text.contains(until)
         return Out(
             // l10n:keep agent tool result
-            if (refused) "没有读取这个屏幕的内容。" else "",
-            error = refused,
-            screen = shown,
-            app = snap.appLabel ?: snap.packageName,
-            summary = "$summary ${snap.id}",
-            decision = if (refused) "refused:read" else "ok",
+            if (missing) "等了最多 5 秒，仍没有看到「$until」。请根据当前屏幕换个文字或交还用户。" else "",
+            error = missing,
+            screen = out.screen,
+            app = out.app,
+            summary = out.summary,
+            decision = if (missing) "untilMissing" else "until",
         )
     }
 
@@ -493,7 +521,7 @@ class PhoneCore(
      * `tap` runs on its id — so the fingerprint re-check, the safety gate and the confirmation
      * are exactly the same. A tie is refused with the candidates, never guessed.
      */
-    private fun tapByText(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner): Out {
+    private fun tapByText(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner, batchApproved: Boolean = false, expectedPackage: String? = null): Out {
         if (!current(owner)) return stoppedOut(PhoneToolCatalog.TAP)
         val sid = a.str("screen")
         val which = when (val r = routeScreenId(sid, "screen")) {
@@ -513,7 +541,7 @@ class PhoneCore(
         }
         val args = linkedMapOf<String, Any?>("screen" to sid, "id" to found)
         if (a.bool("long") == true) args["long"] = true
-        return act(PhoneToolCatalog.TAP, Args(args), scope, owner)
+        return act(PhoneToolCatalog.TAP, Args(args), scope, owner, batchApproved, expectedPackage)
     }
 
     /**
@@ -521,7 +549,7 @@ class PhoneCore(
      * times. Every step is an ordinary scroll, so the gate and the confirmations are the same;
      * the result is the screen where it stopped.
      */
-    private fun scrollUntil(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner): Out {
+    private fun scrollUntil(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner, expectedPackage: String? = null): Out {
         if (!current(owner)) return stoppedOut(PhoneToolCatalog.SCROLL)
         val sid = a.str("screen")
         val which = when (val r = routeScreenId(sid, "screen")) {
@@ -529,38 +557,72 @@ class PhoneCore(
             is Either.Right -> r.value
         }
         sid!!
-        val screenId: String = sid
         val until = a.str("until")!!
         val max = (a.int("max") ?: 10).coerceIn(1, 20)
         val direction = a.str("direction")
+        // l10n:keep agent tool result
+        if (direction?.lowercase() !in listOf("up", "down", "left", "right")) return Out("scroll 需要 direction：up / down / left / right。", error = true)
         val id = a.int("id")
-        var out: Out? = null
+        val driver = when (val d = driverFor(which)) {
+            is Either.Left -> return Out(d.value, error = true, summary = "scroll", decision = "unavailable")
+            is Either.Right -> d.value
+        }
+        if (!current(owner)) return stoppedOut("scroll")
+        if (env.isLocked()) return locked("scroll")
+        val target = if (id != null) driver.target(sid, id) ?: return stale(driver, sid, "scroll", owner) else null
+        var out = screen(Args(mapOf("background" to (which == PhoneScreen.BACKGROUND))), owner)
+        if (out.error) return out
+        var snap = out.screen!!
+        if (expectedPackage != null && snap.packageName != expectedPackage) return Out("前台应用已改变，已停止滚动。", error = true, decision = "app-changed")
+        // l10n:keep agent tool result
+        if (snap.text.contains(until)) return Out("当前屏幕已经出现「$until」，没有滚动。", screen = snap, app = out.app, summary = "scroll", decision = "until")
+        fun body(s: ScreenSnapshot) = s.text.substringAfter('\n', s.text)
+            .replace(Regex("(?m)^(?:\\+\\s*)?\\[\\d+\\]\\s*"), "")
+        var previousBody = body(snap)
+        var unchanged = 0
         for (step in 1..max) {
-            val args = linkedMapOf<String, Any?>("screen" to screenId, "direction" to direction)
+            if (!current(owner)) return stoppedOut("scroll")
+            if (env.isLocked()) return locked("scroll")
+            if (id != null) {
+                val next = driver.target(snap.id, id)
+                if (target!!.viewId.isNullOrBlank() || next?.copy(screenId = target.screenId) != target) {
+                    // l10n:keep agent tool result
+                    return Out("屏幕已更新，无法确认 #$id 仍是同一个列表，已停止滚动。请根据新屏幕重新选择列表，或省略 id 滚动主列表。", error = true, screen = snap, app = out.app, summary = "scroll", decision = "targetChanged")
+                }
+            }
+            val args = linkedMapOf<String, Any?>("screen" to snap.id, "direction" to direction)
             if (id != null) args["id"] = id
-            val step1 = act(PhoneToolCatalog.SCROLL, Args(args), scope, owner)
+            val step1 = act(PhoneToolCatalog.SCROLL, Args(args), scope, owner, expectedPackage = expectedPackage)
             out = step1
             if (step1.error) return step1
-            val snap = step1.screen
-            if (snap != null && snap.text.contains(until)) {
+            if (!current(owner)) return stoppedOut("scroll")
+            if (env.isLocked()) return locked("scroll")
+            snap = step1.screen ?: return Out("滚动后没有读到新屏幕，已停止。请重新 screen 后再操作。", error = true, app = step1.app, summary = step1.summary, decision = "unavailable") // l10n:keep agent tool result
+            if (expectedPackage != null && snap.packageName != expectedPackage) return Out("前台应用已改变，已停止滚动。", error = true, decision = "app-changed")
+            val shown = safety.filterScreen(snap)
+            if (shown !== snap) return Out("没有读取这个屏幕的内容，已停止滚动。", error = true, screen = shown, app = step1.app, summary = step1.summary, decision = "refused:read") // l10n:keep agent tool result
+            if (snap.text.contains(until)) {
                 // l10n:keep agent tool result
                 return Out("滚了 $step 次，出现了「$until」。", screen = snap, app = step1.app, summary = step1.summary, decision = "until")
             }
-            if (!current(owner)) return stoppedOut(step1.summary ?: PhoneToolCatalog.SCROLL)
+            val nextBody = body(snap)
+            unchanged = if (nextBody == previousBody) unchanged + 1 else 0
+            previousBody = nextBody
+            if (unchanged >= 2) return Out("连续两次滚动后正文没有变化，已停止；仍未看到「$until」。", error = true, screen = snap, app = step1.app, summary = step1.summary, decision = "no-progress") // l10n:keep agent tool result
         }
         // l10n:keep agent tool result
         return Out(
             "滚了 $max 次也没看到「$until」。看看屏幕：可能还要多滚几屏，或者文字不一样。",
             error = true,
-            screen = out?.screen,
-            app = out?.app,
-            summary = out?.summary,
+            screen = out.screen,
+            app = out.app,
+            summary = out.summary,
             decision = "untilMissing",
         )
     }
 
     /** tap / type / scroll / tap_xy / gesture: route, resolve, gate, perform. */
-    private fun act(name: String, a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner): Out {
+    private fun act(name: String, a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner, batchApproved: Boolean = false, expectedPackage: String? = null): Out {
         if (!current(owner)) return stoppedOut(name)
         val coordinate = name == PhoneToolCatalog.TAP_XY || name == PhoneToolCatalog.GESTURE || name == PhoneToolCatalog.INPUT
         val screenParameter = if (coordinate) "observation" else "screen"
@@ -675,7 +737,7 @@ class PhoneCore(
         val pkg = target?.packageName ?: driver.foregroundPackage()
         val appLabel = target?.appLabel
         val app = appLabel ?: pkg
-        val verdict = safety.checkWrite(kind, target, pkg, appLabel, typed, submit, point, note)
+        val verdict = safety.checkWrite(kind, target, pkg, appLabel, typed, submit, point, note, batchApproved)
         val decision = when (val r = safety.resolve(verdict, scope)) {
             is SafetyGate.Result.No -> return Out(r.message, error = true, app = app, summary = summary, decision = r.decision)
             is SafetyGate.Result.Go -> r.decision
@@ -684,6 +746,7 @@ class PhoneCore(
         if (!tasks.setAppIfCurrent(owner, appLabel ?: pkg)) return stoppedOut(summary)
         say(ui.get("phone_acting", "DSH 正在操作 · %1\$s", statusLine(kind, target, if (secret) SafetyRules.MASK else typed))) // l10n:keep test default
         if (!current(owner)) return stoppedOut(summary)
+        if (expectedPackage != null && driver.foregroundPackage() != expectedPackage) return Out("前台应用已改变，没有执行。", error = true, decision = "app-changed")
         val res = driver.perform(action)
         if (!res.ok && res.staleSnapshot) return stale(driver, sid, summary, owner, res.message)
         return Out(
@@ -694,6 +757,137 @@ class PhoneCore(
             summary = summary,
             decision = if (res.ok) decision else "failed",
         )
+    }
+
+    /** A plan stays inside one app; every step resolves against a fresh, filtered observation. */
+    private fun routine(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner): Out {
+        val plan = when (val parsed = RoutinePlan.parse(a)) {
+            is Either.Left -> return Out(parsed.value, error = true, summary = "run", decision = "invalid-plan")
+            is Either.Right -> parsed.value
+        }
+        if (plan.dryRun) return Out(Json.write(linkedMapOf(
+            "dryRun" to true, "app" to plan.app, "startAt" to plan.startAt,
+            "steps" to plan.steps.mapIndexed { i, s -> mapOf("step" to i + 1, "action" to s.summary()) },
+            "note" to "参数检查通过；没有读取屏幕或执行动作，目标存在性须在真机检查。",
+        )), summary = "run dryRun", decision = "ok")
+
+        val trace = ArrayList<Map<String, Any?>>()
+        var latest: ScreenSnapshot? = null
+        var completed = 0
+        val started = SerialWorker.now()
+        fun result(ok: Boolean, next: Int?, reason: String, mayHaveActed: Boolean = false) = Out(
+            Json.write(linkedMapOf(
+                "ok" to ok, "completed" to completed, "nextStep" to next, "reason" to reason,
+                "mayHaveActed" to mayHaveActed, "trace" to trace,
+                "resume" to if (ok) null else "先 screen 核对实际页面；不要重放已生效动作。续跑需 startAt + requireText。",
+            )), error = !ok, screen = latest?.takeIf { current(owner) && !env.isLocked() }?.let { safety.filterScreen(it) }, app = plan.app,
+            summary = "run $completed/${plan.steps.size - plan.startAt + 1}", decision = if (ok) "ok" else reason,
+        )
+        fun ready(): Boolean {
+            if (!current(owner)) return false
+            if (tasks.isPaused && !scope.userWait { tasks.awaitResume(PAUSE_WAIT_MS) }) return false
+            return current(owner) && !env.isLocked()
+        }
+        fun observe(): Out {
+            if (!ready()) return stoppedOut("run")
+            val observed = screen(Args(emptyMap()), owner)
+            // Do not return the contents of an unexpected app in a routine's trace.
+            if (observed.screen?.packageName != plan.app) {
+                latest = null
+                return Out("前台应用已改变或无法确认，停止本批操作。", error = true, decision = "app-changed")
+            }
+            latest = observed.screen
+            return observed
+        }
+        fun waitFor(text: String, timeout: Int): Out {
+            val deadline = SerialWorker.now() + timeout
+            while (true) {
+                val read = observe()
+                if (read.error || read.screen?.text?.contains(text) == true) return read
+                if (SerialWorker.now() >= deadline) return Out("等待目标文字超时。", error = true, decision = "untilMissing")
+                env.sleep(250)
+            }
+        }
+        var activeStep = plan.startAt
+        var dispatched = false
+        try {
+            var read = observe()
+            if (read.error) return result(false, plan.startAt, read.decision ?: "unavailable")
+            val remaining = plan.steps.drop(plan.startAt - 1)
+            val description = remaining.take(12).joinToString("\n") { it.summary() } + if (remaining.size > 12) "\n…" else ""
+            val confirmation = safety.confirmation(
+                ui.get("phone_confirm_run", "在 %1\$s 执行 %2\$d 步？\n%3\$s\n提交和敏感按钮仍单独确认。", plan.app, remaining.size, description),
+                plan.app, read.screen?.appLabel, "run",
+            )
+            when (val approved = safety.resolve(confirmation, scope)) {
+                is SafetyGate.Result.No -> return result(false, plan.startAt, approved.decision)
+                is SafetyGate.Result.Go -> Unit
+            }
+            for (index in plan.startAt - 1 until plan.steps.size) {
+                activeStep = index + 1
+                dispatched = false
+                val step = plan.steps[index]
+                val s = step.a()
+                if (!ready()) return result(false, index + 1, "stopped")
+                // Leave time for an admitted device operation to return a useful trace.
+                if (scope.charged(started, SerialWorker.now()) >= RoutinePlan.BUDGET_MS - 30_000) return result(false, index + 1, "budget")
+                read = observe()
+                if (read.error) return result(false, index + 1, read.decision ?: "unavailable")
+                val snap = read.screen!!
+                if (s.str("requireText")?.let { !snap.text.contains(it) } == true) return result(false, index + 1, "precondition")
+                val at = SerialWorker.now()
+                val out = when (step.op) {
+                    "snapshot" -> read
+                    "assert" -> if (snap.text.contains(s.str("text")!!)) read else Out("页面检查不通过。", error = true, decision = "assertion")
+                    "wait" -> if (s.has("text")) waitFor(s.str("text")!!, s.int("timeoutMs") ?: 5000) else {
+                        val end = SerialWorker.now() + s.int("ms")!!
+                        while (SerialWorker.now() < end && ready()) env.sleep(minOf(100L, end - SerialWorker.now()).coerceAtLeast(1))
+                        observe()
+                    }
+                    "tap" -> {
+                        dispatched = true
+                        tapByText(Args(mapOf("screen" to snap.id, "text" to s.str("target"), "long" to s.bool("long"))), scope, owner, batchApproved = true, expectedPackage = plan.app)
+                    }
+                    "type" -> {
+                        val driver = env.driver(PhoneScreen.MAIN)
+                        when (val found = driver?.find(snap.id, s.str("target")!!)) {
+                            is Either.Right -> {
+                                dispatched = true
+                                act(PhoneToolCatalog.TYPE, Args(mapOf("screen" to snap.id, "id" to found.value, "text" to s.text("text"), "submit" to s.bool("submit"))), scope, owner, batchApproved = true, expectedPackage = plan.app)
+                            }
+                            is Either.Left -> Out(found.value, error = true, decision = "target-missing")
+                            null -> Out("无障碍连接已断开。", error = true, decision = "unavailable")
+                        }
+                    }
+                    "scroll" -> {
+                        dispatched = true
+                        val args = Args(step.args + ("screen" to snap.id))
+                        if (s.has("until")) scrollUntil(args, scope, owner, plan.app) else act(PhoneToolCatalog.SCROLL, args, scope, owner, expectedPackage = plan.app)
+                    }
+                    else -> { dispatched = true; key(Args(mapOf("screen" to snap.id, "key" to "back")), owner, plan.app) }
+                }
+                // Re-read successful actions; failed writes stay uncertain and are never retried.
+                var checked = out
+                if (!out.error) checked = if (s.has("expect")) waitFor(s.str("expect")!!, 5000) else observe()
+                else latest = null
+                trace += linkedMapOf("step" to index + 1, "op" to step.op, "ok" to !checked.error,
+                    "elapsedMs" to SerialWorker.now() - at, "mayHaveActed" to dispatched,
+                    "decision" to if (checked.error) checked.decision ?: "failed" else "ok")
+                log.add(PhoneToolCatalog.RUN, plan.app, "${index + 1}. ${step.op}", if (checked.error) "failed" else "ok")
+                if (checked.error) return result(false, index + 1, checked.decision ?: "failed", dispatched)
+                completed++
+            }
+            return result(true, null, "done")
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            latest = null
+            trace += mapOf("step" to activeStep, "ok" to false, "decision" to "stopped", "mayHaveActed" to dispatched)
+            return result(false, activeStep, "stopped", dispatched)
+        } catch (_: Exception) {
+            latest = null
+            trace += mapOf("step" to activeStep, "ok" to false, "decision" to "device-error", "mayHaveActed" to dispatched)
+            return result(false, activeStep, "device-error", dispatched)
+        }
     }
 
     /** A `type` in the log without its length or text: 「输入 s3#5（••••）」. */
@@ -745,7 +939,7 @@ class PhoneCore(
         )
     }
 
-    private fun key(a: Args, owner: PhoneTasks.Owner): Out {
+    private fun key(a: Args, owner: PhoneTasks.Owner, expectedPackage: String? = null): Out {
         if (!current(owner)) return stoppedOut("key")
         val key = when (a.str("key")?.lowercase()) {
             "back" -> PhoneAction.GlobalKey.BACK
@@ -778,6 +972,7 @@ class PhoneCore(
             PhoneAction.GlobalKey.NOTIFICATIONS -> ui.get("phone_key_notifications", "通知栏") // l10n:keep test default
         }))
         if (!current(owner)) return stoppedOut(summary)
+        if (expectedPackage != null && driver.foregroundPackage() != expectedPackage) return Out("前台应用已改变，没有按键。", error = true, decision = "app-changed")
         val res = driver.perform(PhoneAction.Key(sid ?: "${which.prefix}0", key))
         return Out(res.message, error = !res.ok, screen = res.screen?.let { safety.filterScreen(it) }, summary = summary,
             decision = if (res.ok) "ok" else "failed")
@@ -851,6 +1046,7 @@ class PhoneCore(
             PhoneToolCatalog.COLLECT -> 120_000L
             PhoneToolCatalog.GESTURE -> 120_000L
             PhoneToolCatalog.INPUT -> 25_000L
+            PhoneToolCatalog.RUN -> RoutinePlan.BUDGET_MS
             PhoneToolCatalog.HANDOFF -> 30_000L
             else -> 30_000L
         }

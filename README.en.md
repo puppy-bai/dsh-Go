@@ -13,19 +13,21 @@
   An Android client for DeepSeek Harness. Run DSH right on your phone, or drive the one on your computer.
 </p>
 
-> **This repository is a community fork, based on upstream `v1.0.13`.** It has exactly one
-> functional change: a 14th phone-control tool, `gesture`, which lets the agent imitate a human
-> finger from raw screenshot pixels — a long press of any duration, a swipe along any path, a tap,
-> a double tap, a two-finger pinch, and several of those as one sequence. The 13 existing tools keep
-> their names, parameters and behaviour byte for byte. Upstream does not accept outside PRs, so this
+> **This repository is a community fork, based on upstream `v1.0.13`.** It adds `gesture` for
+> coordinate gestures, `input` for coordinate input, and `run` for bounded multi-step routines,
+> plus text targeting, waiting, and scrolling until a target appears. Version 1.0.16 resolves
+> targets on fresh observations, checks the foreground app, and returns progress on failure.
+> See [Phone routines](examples/phone-routines/README.md) for a task skill, 30 scenarios, and a local test page.
+> Upstream does not accept outside PRs, so this
 > fork is maintained separately; see [Coordinate gestures](#gesture) and
 > [docs/gesture-en.md](docs/gesture-en.md). Everything here, including the changes, is released
 > under AGPL-3.0. Upstream is [ccch1mneyyy/dsh-go](https://github.com/ccch1mneyyy/dsh-go), by
 > [ccch1mneyyy](https://github.com/ccch1mneyyy).
 >
-> **Download:** `dsh-go-1.0.14-arm64.apk` (arm64, Android 8.0+) from this repository's
-> [Releases](../../releases/latest). It is debug-signed, so **uninstall the official app first** —
-> that also erases app data. Read [Coordinate gestures](#gesture) below before installing.
+> **Install:** 1.0.16 is a local build delivery for arm64 and Android 8.0+ (screenshots require Android 11+).
+> A community build with the same signing key can be upgraded in place, keeping data. A differently
+> signed upstream APK cannot be replaced directly; never automatically uninstall it after an install failure.
+> See the [routine contract](docs/phone-routines-en.md) and the delivery's actual validation report.
 
 <p align="center">
   <a href="../../releases/latest"><img alt="Android 8+" src="https://img.shields.io/badge/Android-8%2B-4B67B4?style=flat-square&logo=android&logoColor=white&labelColor=2B3245"></a>

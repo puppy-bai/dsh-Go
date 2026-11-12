@@ -225,6 +225,8 @@ class SafetyGate(
         point: Pair<Int, Int>? = null,
         /** What a gesture does, in words (it has no single point to name). */
         note: String? = null,
+        /** Only this local routine was approved; never changes task-wide waiver state. */
+        batchApproved: Boolean = false,
     ): Verdict {
         val app = labelOf(pkg, appLabel)
         if (kind == WriteKind.KEY) return Verdict.Allow // back / home / recents / shade: always a way out
@@ -243,7 +245,7 @@ class SafetyGate(
             return Verdict.Refuse("密码 / 验证码 / 支付框不代填也不代点。请 handoff 让用户输入。", "secret-field")
         }
         // Everything above is a hard rule (or one the person lifted); everything below only asks.
-        if (waived(p)) return Verdict.Allow
+        if (waived(p) && !batchApproved) return Verdict.Allow
         val everyWrite = pkg != null && pkg in p.confirmEveryWritePackages
         val firstInApp = !everyWrite && (pkg == null || !tasks.isApproved(pkg))
         val word = if (kind == WriteKind.TAP || kind == WriteKind.LONG_TAP) SafetyRules.sensitiveWord(target?.label, target?.viewId) else null
@@ -256,7 +258,7 @@ class SafetyGate(
             kind == WriteKind.TYPE && submit -> "submit"
             word != null -> "sensitive:$word"
             everyWrite -> "every-write"
-            firstInApp -> "first-in-app"
+            firstInApp && !batchApproved -> "first-in-app"
             else -> return Verdict.Allow
         }
         val sentence = if (reason == "first-in-app") uiText.get("phone_confirm_first_app", "允许 DSH 在本任务中操作「%1\$s」？第一步：%2\$s", actionApp, action) else action // l10n:keep test default

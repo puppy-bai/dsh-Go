@@ -71,6 +71,7 @@
   "phoneToolTapCoordinates": "点坐标",
   "phoneToolGesture": "手势",
   "phoneToolInput": "按坐标输入",
+  "phoneToolRun": "多步任务",
   "phoneToolHandoff": "交还给你",
   "phoneToolOpenApp": "打开 App",
   "phoneToolListApps": "查看应用",

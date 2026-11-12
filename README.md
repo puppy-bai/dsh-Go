@@ -14,14 +14,16 @@
 </p>
 
 <blockquote>
-<p><b>本仓库是一个社区 Fork，基线为上游 <code>v1.0.13</code>。</b>相对上游只有一处功能改动：
-新增第 14 个手机操控工具 <code>gesture</code>，让它能<b>只按标号截图的像素坐标</b>模拟人的手指——
-任意时长长按、任意路径滑动、点击、双击、双指缩放，并能把多步连成一个动作序列一次做完。
-原有 13 个工具的名字、参数和行为逐字未改。上游不接受外部 PR，所以本仓库独立维护；
+<p><b>本仓库是一个社区 Fork，基线为上游 <code>v1.0.13</code>。</b>手机操控增加了
+<code>gesture</code> 坐标手势、<code>input</code> 坐标输入和 <code>run</code> 多步任务，
+并支持按文字点击、等待和连续滚动。1.0.16 每步重新定位目标、核对前台应用，失败返回进度；
+任务技能、30 项场景分析和本地测试页见 <a href="examples/phone-routines/README.md">手机日常任务包</a>。
+上游不接受外部 PR，所以本仓库独立维护；
 详见<a href="#gesture">坐标手势</a>与 <a href="docs/gesture-zh.md">docs/gesture-zh.md</a>。
 主仓库 <a href="https://github.com/ccch1mneyyy/dsh-go">ccch1mneyyy/dsh-go</a>、原作者 <a href="https://github.com/ccch1mneyyy">ccch1mneyyy</a>。本项目及其改动按 AGPL-3.0 发布，改动部分同样开源。</p>
-<p><b>下载</b>：本仓库 <a href="../../releases/latest">Releases</a> 里的 <code>dsh-go-1.0.14-arm64.apk</code>（arm64，Android 8.0+）。
-它是 debug 签名的，<b>装之前必须先卸载官方版</b>，卸载会清掉应用数据——先读下面的<a href="#gesture">坐标手势</a>一节。</p>
+<p><b>安装</b>：1.0.16 为本地构建交付，arm64、Android 8.0+；无障碍截图需要 Android 11+。
+同一签名的社区版可覆盖升级保留数据；与上游版签名不同不能覆盖，不要让安装脚本自动卸载旧版。
+先读<a href="docs/phone-routines-plan-zh.md">本轮方案</a>及交付包内的实际验证记录。</p>
 </blockquote>
 
 <p align="center">

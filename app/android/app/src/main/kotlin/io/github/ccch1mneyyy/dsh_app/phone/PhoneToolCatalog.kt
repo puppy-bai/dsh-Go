@@ -23,6 +23,7 @@ object PhoneToolCatalog {
     const val TAP_XY = "tap_xy"
     const val GESTURE = "gesture"
     const val INPUT = "input"
+    const val RUN = "run"
     const val HANDOFF = "handoff"
 
     class Tool(val name: String, val description: String, val properties: Map<String, Any?>, val required: List<String>) {
@@ -307,6 +308,18 @@ object PhoneToolCatalog {
             listOf("observation", "steps"),
         ),
         Tool(
+            RUN,
+            // l10n:keep agent tool catalog
+            "在一个应用内顺序执行最多 60 步（240 秒预算），每步重新读屏按文字找目标；普通操作整批确认，发送/提交等敏感操作仍单独确认。失败立即停，不自动重试写操作。返回 trace/completed/nextStep；dryRun 仅检查整批参数，不读屏不操作。先 open 并 screen 核对包名。宏不支持坐标或无限循环。",
+            linkedMapOf(
+                "app" to str("预期当前应用的完整包名，切到别的应用立即停止"),
+                "steps" to array("1–60 步。op: tap{target,long?,expect?}; type{target,text,submit?,expect?}; scroll{direction,until?,max?,expect?}; wait{ms:0–10000} 或 wait{text,timeoutMs:250–10000}; assert{text}; snapshot{}; key{key:back,expect?}。target 是可见文字/提示/viewId 片段，不能是缓存编号。各步可带 requireText 前置检查。expect 在动作后最多等5秒。"),
+                "dryRun" to bool("仅检查参数，不执行；默认 false"),
+                "startAt" to int("从第几步开始，默认1；恢复必须先读屏，并给该步 requireText，不能盲重放"),
+            ),
+            listOf("app", "steps"),
+        ),
+        Tool(
             HANDOFF,
             // l10n:keep agent tool catalog
             "把手机交给用户完成登录、验证码、支付或没把握的步骤；等用户点「继续」或「停止」，最长 10 分钟。",
@@ -321,5 +334,5 @@ object PhoneToolCatalog {
     fun listJson(): List<Map<String, Any?>> = tools.map { it.toJson() }
 
     /** Tools that act on a screen through a [PhoneDriver] (need accessibility or the background display). */
-    val SCREEN_TOOLS = setOf(SCREEN, COLLECT, TAP, TYPE, SCROLL, KEY, TAP_XY, GESTURE, INPUT, HANDOFF)
+    val SCREEN_TOOLS = setOf(SCREEN, COLLECT, TAP, TYPE, SCROLL, KEY, TAP_XY, GESTURE, INPUT, RUN, HANDOFF)
 }

@@ -9941,6 +9941,9 @@ class L10nEn extends L10n {
   String get phoneToolInput => 'Type at point';
 
   @override
+  String get phoneToolRun => 'Run routine';
+
+  @override
   String get phoneToolHandoff => 'Hand back to you';
 
   @override

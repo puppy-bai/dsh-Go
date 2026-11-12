@@ -71,6 +71,7 @@
   "phoneToolTapCoordinates": "Tap coordinates",
   "phoneToolGesture": "Gesture",
   "phoneToolInput": "Type at point",
+  "phoneToolRun": "Run routine",
   "phoneToolHandoff": "Hand back to you",
   "phoneToolOpenApp": "Open app",
   "phoneToolListApps": "View apps",

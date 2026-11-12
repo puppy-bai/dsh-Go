@@ -24,6 +24,7 @@ String phoneToolLabel(String tool) {
     'tap_xy' => appL10n.phoneToolTapCoordinates,
     'gesture' => appL10n.phoneToolGesture,
     'input' => appL10n.phoneToolInput,
+    'run' => appL10n.phoneToolRun,
     'handoff' => appL10n.phoneToolHandoff,
     'open' => appL10n.phoneToolOpenApp,
     'apps' => appL10n.phoneToolListApps,

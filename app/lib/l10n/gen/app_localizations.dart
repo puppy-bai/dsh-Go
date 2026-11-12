@@ -17468,6 +17468,12 @@ abstract class L10n {
   /// **'按坐标输入'**
   String get phoneToolInput;
 
+  /// No description provided for @phoneToolRun.
+  ///
+  /// In zh, this message translates to:
+  /// **'多步任务'**
+  String get phoneToolRun;
+
   /// No description provided for @phoneToolHandoff.
   ///
   /// In zh, this message translates to:

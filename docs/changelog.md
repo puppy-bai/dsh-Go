@@ -2,6 +2,22 @@
 
 每个版本先中文、后英文。发版时把对应版本的正文（不含版本标题）作为 Release 正文，见 `docs/release.md`。
 
+## 1.0.16 · 2026-11-10
+
+### 中文
+
+- 新增第 16 个手机工具 `run`：单应用最多 60 步，整批参数预检、每步重新读屏和文字定位、前后台包名守卫、结果检查、失败进度与受前置条件保护的手动续跑。普通操作批量确认，敏感按钮和提交仍单独确认；不自动重放失败写操作。
+- 修复 `scroll.until` 重用旧屏幕号导致第二次滚动失败，先检查目标是否已经可见，并在页面停滞时提前退出。`screen.until` 只在最后截图，等待超时明确报错。
+- 附带手机任务技能、本地模拟表单/聊天/签到/练习测试页及 30 项场景分析。通知触发的全天候自动回复、后台定时签到与跨重启恢复尚未提供。
+- 实际单测、构建及真机结果见交付包验证记录；不沿用旧版验证结论。
+
+### English
+
+- Add the 16th phone tool, `run`: up to 60 steps in one app, full-plan validation, fresh text targeting, foreground-package guards, result checks, progress on failure, and manual resumption protected by a visible precondition. Normal actions share approval; sensitive actions and submission still ask separately. Failed writes are never replayed automatically.
+- Fix `scroll.until` reusing an old observation after the first scroll; already visible targets require no scroll, and unchanged content stops the loop. `screen.until` captures images only at the end and reports timeout as an error.
+- Include a DSH task skill, isolated form/chat/check-in/quiz page, and 30 scenario assessments. Notification-driven auto-replies, background scheduling, and recovery across restarts are not included.
+- See the delivery validation record for actual tests, build, and device results; previous release claims are not reused.
+
 ## 1.0.15 · 2026-11-09
 
 ### 中文
