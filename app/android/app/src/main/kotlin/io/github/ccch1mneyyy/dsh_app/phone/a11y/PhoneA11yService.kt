@@ -80,6 +80,11 @@ class PhoneA11yService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         clock.tick(event?.packageName)
+        // Content/scroll changes are also caused by our own actions. Only the explicit
+        // interaction signal can identify a touch, and even it is not delivered by every ROM.
+        if (event?.eventType == AccessibilityEvent.TYPE_TOUCH_INTERACTION_START && !InjectGuard.active()) {
+            PhoneRegistry.controlListener?.onUserInteraction()
+        }
     }
 
     /**

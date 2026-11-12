@@ -27,6 +27,7 @@ import '../shell/page_frame.dart';
 import '../theme/app_icons.dart';
 import '../theme/theme.dart';
 import 'action_log_page.dart';
+import 'automation_page.dart';
 import 'a11y_restore_sheet.dart';
 import 'app_rules_page.dart';
 import 'dnd_mode_page.dart';
@@ -321,6 +322,18 @@ class _PhoneControlScreenState extends ConsumerState<PhoneControlScreen> {
             ],
           ),
         ],
+        gap,
+        ListPageCard(
+          children: [
+            ListPageRow(
+              icon: AppIcons.appRules,
+              title: l10n.automationTitle,
+              subtitle: l10n.automationSubtitle,
+              subtitleMaxLines: 2,
+              onTap: () => _push(const PhoneAutomationPage()),
+            ),
+          ],
+        ),
         gap,
         if (!state.loaded)
           const QuietSpinner(padding: EdgeInsets.symmetric(vertical: 32))

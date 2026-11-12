@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../state/phone_state.dart';
 import '../../state/phone_turn_end.dart';
+import '../../state/automation_coordinator.dart';
 
 /// Keeps [phoneStopWatcherProvider] alive under the home shell, so 停止 on
 /// the phone-control overlay also ends the running turn while the app is in
@@ -19,6 +20,7 @@ class PhoneStopWatcher extends ConsumerWidget {
     ref.watch(phoneStopWatcherProvider);
     ref.watch(phoneTurnEndProvider);
     ref.watch(phoneConfirmPendingProvider);
+    ref.watch(automationCoordinatorProvider);
     return child;
   }
 }

@@ -124,3 +124,85 @@ Under **Advanced**:
 - **Non-disruptive mode**: works on a hidden screen while you use your phone. Needs Android 14 or later. Pick one under **Channel**: Shizuku if the Shizuku app is installed; Sui if Magisk or KernelSU has the Sui module; Root on a rooted phone (your root manager asks when you tap "Turn on with Root", and su never runs before that); Direct ADB otherwise. Open a channel to see its checklist, finish the setup, then tap "Turn on with …"; the page marks the suggested one but never picks it for you. Shizuku and Direct ADB need Wi-Fi with wireless debugging on, and the screen must still stay on and unlocked. Once it is on, a "Keep … channel" switch sits under "Using …", off by default: with it on, DSH Go reconnects the channel by itself after a disconnect, reopening the app or restarting your phone, so you don't pick it again; with it off, the mode must be reactivated after a restart. "Keep root channel" means DSH Go asks your root manager again by itself, and the manager still decides; Shizuku and Sui only use the permission they already gave and wait for their service, and Direct ADB only uses its existing pairing. An app you force-stopped in system settings doesn't come back on its own after a restart; open DSH Go once.
 - **Background running**: prevents Android from turning off accessibility; opens the phone settings guide.
 - **Confirmations and return**: see confirmations and task results in time; see Confirmations and return above.
+
+## Saved phone tasks
+
+The saved-tasks page under Phone control runs a known flow locally. Waiting, branches and bounded loops do not need an AI request per step. Page interpretation, visual targeting and repairs still need a model. Existing single-action phone tools remain available.
+
+1. In chat, specify the goal, allowed apps, parameters and stopping point. Ask AI to inspect the actual page before generating a schema-1 task. Importing JSON creates a proposal and never starts it.
+2. Review the complete flow, apps and limits. You can confirm a single run first; this does not save the task or grant lasting authority, and the proposal remains available.
+3. Save a flow once it is worth reusing. Specify allowed parameter values, or explicitly allow all values accepted by the parameter definition. Choose confirmation per run or long-term authorization. Changed flows need a newly reviewed revision.
+4. Start saved tasks with parameters from the task page or ask AI to call their task ID in chat. Values outside approved scopes require your approval for that run; they do not expand the saved scope.
+
+Global automatic mode is enabled by you and persists after restart until you turn it off. It skips run confirmation within approved scopes. Declared apps, parameter scopes, app rules, system permissions and forbidden actions still apply. Turning it off does not revoke individual long-term task authorizations.
+
+Only one local automation task runs at a time. After a pause, an out-of-scope app switch, a lock or an unavailable observation, check the current page and choose resume or stop in the task page. Resume observes the page again. A run interrupted by process exit is not replayed. If a send or submission may have happened but cannot be verified, the reason is `result-uncertain`. This release cannot directly resume that run: inspect the actual result, stop it and create the remaining flow to avoid duplicate writes.
+
+At most two repair rounds are allowed per whole run, within the original apps and capabilities. Repairs never silently replace a saved definition; review the new revision first. Sanitized run summaries retain up to 100 records for 7 days, without message text, screen text or AI prompts. Task definitions and parameter values you explicitly save are stored locally.
+
+## Local screenshot evidence
+
+Local screenshot evidence is off by default on the task page and requires your confirmation to enable. It can retain images from explicit `snapshot` nodes, on-demand AI vision and failure capture. Add `snapshot` before `finish` when you need a result image. Completion does not automatically produce a result frame every time, and this is not screen recording.
+
+Images stay on this device and are not sent automatically. Retention is limited to 10 images per run, 50 MB in total and 7 days. Tap a thumbnail on the task page to enlarge it; missing files are reported. Images may contain private content, so review them before sharing.
+
+Turning the switch off stops future retention but keeps existing images. Confirming Clear screenshot evidence deletes all retained images while keeping tasks, text results and the switch setting. Model tools do not receive the local image file list.
+
+## Task JSON format
+
+This is a read-only template. `example.phone.lab` is a placeholder package, not a browser or a universal app identifier. Observe the real app to confirm its package, visible text and starting state before replacing it. Parser validation does not prove that a page works on a device.
+
+```json
+{
+  "schema": 1,
+  "id": "local-check",
+  "name": "Read-only local page check",
+  "apps": ["example.phone.lab"],
+  "steps": [
+    {"op": "snapshot"},
+    {"op": "wait", "text": "DSH 手机操控验收页", "timeoutMs": 10000},
+    {"op": "assert", "text": "DSH 手机操控验收页"},
+    {"op": "finish", "result": {"status": "verified"}}
+  ],
+  "limits": {"timeoutMs": 60000, "maxActions": 10, "maxAiCalls": 0}
+}
+```
+
+Required fields are `schema: 1`, `id`, `name`, `apps` and nonempty `steps`. Optional fields include `parameters`, `limits`, `capabilities`, `description` and `forbiddenTargets`; saving assigns the next revision. Limits are 10 apps, 200 definition nodes and 4 nesting levels. Arbitrary JavaScript, shell and Auto.js scripts are not supported.
+
+| Operation | Required fields and meaning |
+| --- | --- |
+| `open` | `app`: a declared package |
+| `tap`, `type` | Visible `target` text or a `selector`; `type` also needs `text` |
+| `observe`, `snapshot` | Read the current page; no other required fields |
+| `read_text` | `target` or `selector`, and `name` for a run-local variable |
+| `scroll` | `direction`: up/down/left/right; optional `until` text and `max`, at most 20 |
+| `key` | Only `key: "back"` in this release |
+| `tap_xy`, `input` | A recent `observation`, `x`, `y`; `input` also needs `text` |
+| `assert` | Current visible `text` condition |
+| `wait` | Either a fixed `ms`, or `text` with `timeoutMs` |
+| `if` | `condition`, `then`, optional `else` |
+| `repeat` | `count` from 1 to 100 and body `steps`; optional `until` checked before each iteration |
+| `break` | Leave the current loop |
+| `set` | Run-local `name` and `value`; cannot overwrite start parameters |
+| `ai` | Decision `prompt`, optional `name` for its returned value |
+| `plugin` | The actual installed `tool` and declared `arguments`; wait for its real receipt |
+| `finish` | Optional `result`; end the task |
+
+Conditions use `{"text":"Done","match":"contains"}` or `{"variable":"done","equals":true}`; `not: true` inverts the result. Text matching supports `contains`, `exact` (one complete line) and `normalized` (contains after collapsing whitespace), not regular expressions. Any step can use `requireText` before acting and `expect` afterwards. A failed postcondition after a write makes the result uncertain.
+
+`parameters` declares named values with `type` string/integer/number/boolean and optional `default`, `required`, `enum`, `min`, `max`, `maxLength`. For example: `{"message":{"type":"string","required":true,"maxLength":100}}`. `${message}` refers to a parameter or an earlier run-local value; a whole-value reference preserves its type. Plugin arguments may reference declared start parameters only, not run-local variables that could change a recipient or target.
+
+Omitted `capabilities` are inferred from the definition. Actions subsequently supplied by AI must also be declared; for example, use `"capabilities":["observe","tap","type"]` if a checkpoint may add taps and text input. Capabilities do not remove app or parameter restrictions. `forbiddenTargets` lists targets that cannot be tapped. Tasks with forbidden targets reject coordinates because the executor cannot prove that a coordinate avoids a forbidden button.
+
+`limits.timeoutMs` counts active time. Ordinary tasks default to 10 minutes with a 30-minute maximum; `continuous: true` defaults to 60 minutes with a 120-minute maximum. Pauses are excluded, waits included. `maxActions` defaults to and cannot exceed 500, counting native writes and plugin nodes. `maxAiCalls` defaults to and cannot exceed 20 for ordinary tasks or 50 for continuous ones, and may be 0. It counts AI checkpoints, not underlying model requests or token cost: one checkpoint can need several model turns. Fixed waits are limited to 120 seconds and text waits to 30 seconds.
+
+## Chat tool and visual targeting
+
+`mcp__phone__task` accepts actions `list/get/validate/propose/start/status/pause/resume/stop/ai_result/repair`. Resuming requires the user in the task page; the model cannot authorize it. Saving, authority changes and global mode also require your confirmation in the app.
+
+AI uses `validate` for definitions, `propose` for review candidates and `start` for saved tasks. An AI node changes the run to `awaiting_ai`, with `runId`, `checkpoint` and `kind` in status. A `get` with the current `runId` reads a detached definition and bound parameters. AI must inspect the current state and return `ai_result` or `repair` for that same checkpoint. Pausing or stopping invalidates old checkpoints. Repair `steps` describe only the remaining workflow, never an implicit replay.
+
+This release has no local OCR guarantee. When an ordinary capturable page has no usable accessibility text, an image-capable model must inspect the screenshot and target using a valid observation ID. A clear screenshot does not authorize every coordinate: app rules, forbidden targets, system protection and stale-observation checks may still refuse. Models without image input cannot perform this visual fallback.
+
+Shopping and course flows depend on real pages and account state. Declare the stopping point, candidate count, course chapters and question scope. Template validation, timed waits or a model's verbal report do not prove an order, actual playback, credited course progress or a correct answer. Scheduling, notification triggers, boot execution and volume-key triggers are outside this release.

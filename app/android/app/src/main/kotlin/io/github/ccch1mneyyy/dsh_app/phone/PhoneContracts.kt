@@ -38,13 +38,17 @@ data class ScreenSnapshot(
     /** Foreground app label and package, when known. */
     val appLabel: String?,
     val packageName: String?,
-    /** The window refused capture (FLAG_SECURE) or the tree came back empty for a secure window. */
+    /** The screenshot API explicitly refused capture as a secure window. Empty trees are separate. */
     val secure: Boolean = false,
     /** Fewer than five text nodes: games, canvases, some mini-programs. */
     val poorTree: Boolean = false,
     /** Optional numbered screenshot (same element ids drawn on it), PNG or JPEG bytes. */
     val image: ByteArray? = null,
     val imageMime: String? = null,
+    /** Real target text after viewport/ancestor clipping; null only for legacy drivers. */
+    val visibleTexts: List<String>? = null,
+    /** A known observation failure, never inferred from an empty tree as a system protection. */
+    val observationReason: String? = null,
 )
 
 /** What an element looks like to the safety rules, resolved from a snapshot id + element id. */
@@ -130,6 +134,8 @@ data class ActionResult(
     val screen: ScreenSnapshot? = null,
     /** Explicit fingerprint rejection before input. Refresh once; never replay the action. */
     val staleSnapshot: Boolean = false,
+    /** Stable machine-readable failure classification when the driver knows the cause. */
+    val reasonCode: String? = null,
 )
 
 data class CollectResult(
@@ -144,6 +150,8 @@ data class CollectResult(
 /** Whether a driver can work right now, and if not, a sentence the model can relay. */
 data class Availability(val ok: Boolean, val reason: String? = null, val userReason: String? = null)
 
+data class TargetLookup(val elementId: Int?, val message: String? = null, val reasonCode: String? = null)
+
 /**
  * A screen the agent can read and drive. Implemented by the accessibility service
  * (MAIN) and by the virtual-display module (BACKGROUND). All calls block and must
@@ -155,6 +163,19 @@ interface PhoneDriver {
     fun availability(): Availability
 
     fun observe(detail: Boolean, image: Boolean): ScreenSnapshot
+
+    /** Retains old test/background drivers while main-screen assertions use actual visible targets. */
+    fun hasVisibleText(snapshot: ScreenSnapshot, text: String, match: String = "contains"): Boolean {
+        val candidates = snapshot.visibleTexts ?: listOf(snapshot.text)
+        return candidates.any { candidate -> when (match) {
+            "exact" -> candidate == text
+            "normalized" -> TextSelector.norm(candidate).contains(TextSelector.norm(text))
+            else -> candidate.contains(text)
+        } }
+    }
+
+    /** Reuse only when a driver can prove the observation is still fresh; default is a re-read. */
+    fun reusableSnapshot(screenId: String): ScreenSnapshot? = null
 
     fun collect(screenId: String, listElementId: Int, maxPages: Int, until: String?): CollectResult
 
@@ -176,6 +197,18 @@ interface PhoneDriver {
     fun find(screenId: String, text: String): Either<String, Int> =
         // l10n:keep agent tool result
         Either.Left("这个屏幕不支持按文字找元素，用 id 指定。")
+
+    /** Structured equivalent of find; old drivers retain their text-based explanation. */
+    fun lookup(screenId: String, text: String): TargetLookup = when (val result = find(screenId, text)) {
+        is Either.Right -> TargetLookup(result.value)
+        is Either.Left -> TargetLookup(null, result.value, "target-missing")
+    }
+
+    fun select(screenId: String, selector: Map<String, Any?>): TargetLookup {
+        val query = selector["text"] as? String ?: selector["viewId"] as? String
+            ?: selector["description"] as? String ?: return TargetLookup(null, "选择器缺少目标。", "invalid-selector")
+        return lookup(screenId, query)
+    }
 
     fun perform(action: PhoneAction): ActionResult
 
@@ -273,6 +306,9 @@ interface ControlListener {
 
     /** The accessibility service connected or went away (for the `status` event). */
     fun onAccessibilityChanged(connected: Boolean) {}
+
+    /** A platform touch-interaction event outside this service's own injected input. */
+    fun onUserInteraction() {}
 }
 
 /**

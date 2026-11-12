@@ -33,18 +33,18 @@ internal class Capture(
     val partial: Boolean = false,
     /**
      * Title of a front window whose root the system won't give us. This can happen with
-     * accessibilityDataSensitive pages or a transition; conservatively forwarded as secure.
+     * accessibilityDataSensitive pages or a transition; the missing root is not proof of FLAG_SECURE.
      */
     val hiddenWindowTitle: String? = null,
     /**
      * Title of the front window that is there but gives us only empty layout shells.
-     * Android 14+ hides views marked accessibilityDataSensitive from non-tool
-     * services this way (GitHub, banking and password pages), so the root survives while the
-     * content subtree does not. Only a hint: report 「可能受敏感视图策略限制」, never assert
-     * that the app is a sensitive page (a fresh, still-drawing app looks the same for a moment).
+     * Filtering and an unfinished page can both look like this. Record the observation gap,
+     * not a guessed system protection; screenshot availability is measured independently.
      */
     val unreadableWindowTitle: String? = null,
     val takenAt: Long = SystemClock.uptimeMillis(),
+    /** Event generation sampled before traversal; an event during capture prevents reuse. */
+    val eventCount: Long = -1,
 ) {
     fun native(ref: Int): AccessibilityNodeInfo? = natives.getOrNull(ref)
 
@@ -79,12 +79,21 @@ internal object TreeCapture {
         val rect = Rect()
     }
 
-    fun capture(service: AccessibilityService, screen: Box, ownPackage: String, budgetMs: Long): Capture {
+    fun capture(service: AccessibilityService, screen: Box, ownPackage: String, budgetMs: Long, eventCount: Long = -1): Capture {
         val st = State(SystemClock.uptimeMillis() + budgetMs)
         val all = try { service.windows } catch (_: Throwable) { null }
         val sorted = all.orEmpty().sortedByDescending { it.layer }
         // Scan every window before the content loop can stop at an opaque app window.
         val keyboard = WindowContent.keyboardShown(all?.map { it.type }, AccessibilityWindowInfo.TYPE_INPUT_METHOD)
+        // A docked IME can cover editors even when their accessibility bounds stay unchanged.
+        val keyboardTop = all.orEmpty().filter { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+            .mapNotNull { window ->
+                val rect = Rect()
+                runCatching { window.getBoundsInScreen(rect) }.getOrNull() ?: return@mapNotNull null
+                val box = Box(rect.left, rect.top, rect.right, rect.bottom).intersect(screen)
+                box.top.takeIf { !box.isEmpty && box.bottom >= screen.bottom && box.width >= screen.width * 4 / 5 }
+            }.minOrNull()
+        val contentViewport = keyboardTop?.let { Box(screen.left, screen.top, screen.right, it) } ?: screen
         val chosen = mutableListOf<UiWindow>()
         var topPackage: String? = null
         var ownFront = false
@@ -145,7 +154,7 @@ internal object TreeCapture {
             if (Build.VERSION.SDK_INT < 33) all.orEmpty().forEach { runCatching { it.recycle() } }
         }
         return Capture(
-            windows = chosen,
+            windows = VisibleTree.windows(chosen, contentViewport),
             natives = st.natives,
             keyboardShown = keyboard,
             screen = screen,
@@ -156,6 +165,7 @@ internal object TreeCapture {
             partial = partial,
             hiddenWindowTitle = hidden,
             unreadableWindowTitle = unreadable,
+            eventCount = eventCount,
         )
     }
 

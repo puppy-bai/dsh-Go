@@ -2,6 +2,8 @@
   <b>简体中文</b> · <a href="README.en.md">English</a>
 </p>
 
+> **1.0.17 自动任务候选版**：新增本地条件分支、有限循环、临时运行、审核保存与参数复用，以及可选的本机截图证据。详见[自动任务指南](docs/guide/zh/04-phone-control.md#自动任务保存和重复运行)和[候选版更新记录](docs/changelog.md#1017--2026-11-12-候选--candidate)。本次未安装或进行真机验收。
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-zh-dark.webp">

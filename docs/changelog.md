@@ -2,6 +2,26 @@
 
 每个版本先中文、后英文。发版时把对应版本的正文（不含版本标题）作为 Release 正文，见 `docs/release.md`。
 
+## 1.0.17 · 2026-11-12 候选 / Candidate
+
+### 中文
+
+- 新增 schema 1 本地自动任务和 `task` 工具：参数校验、条件分支、有限循环、等待、跨已声明应用的执行及受限 AI 检查点。确定动作在手机本地继续，复杂判断才交给 AI；不执行任意 Auto.js、JavaScript 或 shell 脚本。
+- 新增自动任务页，支持提案审核、仅运行本次、保存后一键参数化复用、逐次确认、单任务长期授权和重启后保留的全局自动模式。模型不能自行保存批准、扩大参数范围或开启全局模式。
+- 同次任务支持暂停、继续、停止和累计最多两轮修复；暂停或停止使旧 AI 检查点失效。结果不明的发送/提交标记 `result-uncertain`，不自动重放。修复后的保存版本仍需审核。
+- 可选本机截图证据默认关闭，留存显式 snapshot、按需 AI 读图及失败帧，支持缩略图查看和本机清理；每次最多 10 张、总计 50MB、保留最多 7 天。不是每次完成都会自动产生结果帧。
+- 修正目标可见性和失败原因诊断，增加任务指南、本地测试页及人工测试提示词。界面的 AI 次数是检查点数量，不等于实际模型网络调用数或 token 账单。
+- 按用户要求，本次不安装 APK、不操控手机，真实 App 场景尚未验收。自动测试、静态检查和 APK 构建的实际结果以本次交付验证记录为准；不能沿用旧版本的真机结论。
+
+### English
+
+- Add schema 1 native phone tasks and the `task` tool: typed parameters, conditions, bounded loops, waits, execution across declared apps and constrained AI checkpoints. Known actions continue locally; AI handles decisions. Arbitrary Auto.js, JavaScript and shell scripts are not executed.
+- Add a task page for proposal review, one-time runs, saved parameterized reuse, per-run confirmation, per-task ongoing authorization and persistent global automatic mode. Models cannot approve saving, expand approved parameter scopes or enable global mode themselves.
+- Pause, resume and stop the same run, with at most two cumulative repair rounds. Pausing or stopping invalidates old AI checkpoints. Uncertain sends or submissions report `result-uncertain` and are not replayed automatically. Saving repaired definitions still requires review.
+- Optional local screenshot evidence is off by default. Explicit snapshots, on-demand AI images and failure frames can be retained, previewed and cleared locally: 10 per run, 50 MB total, up to 7 days. A completed run does not always create a result frame.
+- Improve target visibility and failure diagnostics; include task guides, a local test page and manual test prompts. The AI count represents checkpoints, not actual model network requests or token billing.
+- At the user's request, this work does not install the APK or control a phone. Real-app scenarios remain unverified. See this delivery's validation record for actual automated checks and APK build results; older device results do not validate this candidate.
+
 ## 1.0.16 · 2026-11-10
 
 ### 中文

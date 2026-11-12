@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "video-browse-bounded",
+  "name": "有界短视频浏览模板",
+  "apps": ["example.video.app"],
+  "parameters": {
+    "readyText": {"type": "string", "required": true, "default": "替换为实际页面可见标识"}
+  },
+  "steps": [
+    {"op": "open", "app": "example.video.app"},
+    {"op": "assert", "text": "${readyText}"},
+    {
+      "op": "repeat",
+      "count": 10,
+      "steps": [
+        {"op": "wait", "ms": 30000},
+        {"op": "scroll", "direction": "down"}
+      ]
+    },
+    {"op": "snapshot"},
+    {"op": "finish", "result": {"status": "completed", "scheduledWatchSeconds": 300}}
+  ],
+  "limits": {"continuous": true, "timeoutMs": 600000, "maxActions": 20, "maxAiCalls": 0}
+}

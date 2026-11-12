@@ -1,6 +1,6 @@
 // Portions derived from Phase (https://github.com/CikeSeven/phase), used with the author's permission. See THIRD_PARTY_NOTICES.md.
 // Local changes: blocking with a timeout; API 30–33 full-display capture with the overlay
-// hidden; element numbers drawn on the image; near-black frames treated as secure; JPEG, long
+// hidden; element numbers drawn on the image; unusable near-black frames reported separately; JPEG, long
 // side ≤ 1300 px.
 
 package io.github.ccch1mneyyy.dsh_app.phone.a11y
@@ -80,7 +80,7 @@ internal class ScreenShooter(private val service: AccessibilityService, private 
         val bitmap = raw.bitmap ?: return Shot(null, null, null, false, raw.error ?: "截图失败")
         try {
             // l10n:keep agent screenshot result
-            if (looksBlack(bitmap)) return Shot(null, null, null, true, "截图全黑，可能是禁止截图的页面")
+            if (looksBlack(bitmap)) return Shot(null, null, null, false, "截图接近全黑，无法判断画面内容；尚未确认系统禁止截图")
             val takenAt = raw.takenAtMillis
             val origin = if (useWindow) window.bounds else screen
             val factor = minOf(1f, 1300f / max(bitmap.width, bitmap.height))
@@ -183,7 +183,7 @@ internal class ScreenShooter(private val service: AccessibilityService, private 
         return Raw(null, false, "截图失败")
     }
 
-    /** ≥ 97% of a 32×32 sample near-black: a FLAG_SECURE layer blanked out of a display capture. */
+    /** ≥ 97% near-black is unusable evidence, not proof of a FLAG_SECURE window. */
     private fun looksBlack(bitmap: Bitmap): Boolean {
         var dark = 0
         val n = 32

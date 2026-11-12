@@ -17,6 +17,9 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.PluginRegistry
 import java.util.concurrent.Executors
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Flutter bridge for phone control: MethodChannel `dsh/phone`, EventChannel `dsh/phone/events`.
@@ -106,6 +109,25 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
+            "automationList", "automationGet", "automationPropose", "automationSave",
+            "automationStart", "automationStartOnce", "automationStatus", "automationPause", "automationResume", "automationStop",
+            "automationSetGlobal", "automationDisable", "automationDelete",
+            "automationSetEvidence", "automationEvidence", "automationClearEvidence" -> {
+                val action = when (call.method) {
+                    "automationSave" -> "approve"
+                    "automationSetGlobal" -> "set_auto"
+                    "automationStartOnce" -> "start_once"
+                    "automationSetEvidence" -> "set_evidence"
+                    "automationClearEvidence" -> "clear_evidence"
+                    "automationDisable" -> "set_enabled"
+                    else -> call.method.removePrefix("automation").replaceFirstChar { it.lowercase() }
+                }
+                val args = (call.arguments as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value }.orEmpty()
+                async(result, shortControl = true) {
+                    if (action in setOf("resume", "start", "start_once")) handoffAutomation(action, args)
+                    else control.automationRequest(action, args)
+                }
+            }
             "status" -> async(result, shortControl = true) { control.status() }
             "setBackgroundKeep" -> {
                 val selected = call.argument<String>("mode").orEmpty()
@@ -196,6 +218,41 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
         if (call.method == "setBackgroundMode" || call.method == "adbConnect" || call.method == "requestShizukuPermission") {
             control.emitStatus()
         }
+    }
+
+    private fun handoffAutomation(action: String, args: Map<String, Any?>): Map<String, Any?> {
+        if (action in setOf("start", "start_once")) {
+            // Return parameter confirmation errors while the review page is still visible.
+            val check = control.automationRequest(if (action == "start") "check_start" else "check_once", args)
+            if (check["ok"] != true) return check
+        }
+        val owner = promptOwner
+        val handoff = AutomationUiHandoff(
+            status = { control.automationRequest("status", emptyMap())["run"] as? Map<*, *> ?: emptyMap<String, Any?>() },
+            hideSettings = {
+                val finished = CountDownLatch(1)
+                val moved = AtomicBoolean(false)
+                val pending = AtomicBoolean(true)
+                main.post {
+                    try {
+                        val host = activity?.activity
+                        if (pending.getAndSet(false) && attached && promptOwner === owner && host != null)
+                            moved.set(runCatching { host.moveTaskToBack(true) }.getOrDefault(false))
+                    } finally { finished.countDown() }
+                }
+                val returned = finished.await(1000, TimeUnit.MILLISECONDS)
+                pending.set(false)
+                returned && moved.get()
+            },
+            foreground = { PhoneRegistry.mainDriver?.foregroundPackage() },
+            dispatch = {
+                if (control.isLocked()) mapOf("ok" to false, "reason" to "device-locked")
+                else if (attached && promptOwner === owner) control.automationRequest(action, args)
+                else mapOf("ok" to false, "reason" to "stale-run")
+            },
+            ownPackage = appContext.packageName,
+        )
+        return if (action == "resume") handoff.run(args["runId"] as? String) else handoff.start()
     }
 
     private fun cancelledSelection(): Map<String, Any?> =

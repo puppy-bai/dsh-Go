@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "parameter-branch-loop",
+  "name": "参数、分支与循环验收",
+  "apps": ["example.phone.lab"],
+  "parameters": {
+    "message": {"type": "string", "required": true, "default": "本地测试", "maxLength": 100},
+    "expected": {"type": "string", "required": true, "default": "本地测试", "maxLength": 100}
+  },
+  "steps": [
+    {"op": "assert", "text": "DSH 手机操控验收页"},
+    {
+      "op": "if",
+      "condition": {"text": "已完成"},
+      "then": [{"op": "snapshot"}, {"op": "finish", "result": {"status": "already_done"}}],
+      "else": [
+        {"op": "type", "target": "姓名输入框", "text": "${message}"},
+        {"op": "assert", "text": "${expected}"},
+        {"op": "repeat", "count": 3, "steps": [{"op": "wait", "ms": 50}]},
+        {"op": "snapshot"},
+        {"op": "finish", "result": {"status": "verified"}}
+      ]
+    }
+  ],
+  "limits": {"timeoutMs": 60000, "maxActions": 10, "maxAiCalls": 0}
+}

@@ -13,6 +13,10 @@ class PhoneRoutineFailureTest {
         var locked = false
         var reads = 0
         var serial = 0
+        var visibleTexts: List<String>? = null
+        var observationReason: String? = null
+        var allowReuse = false
+        var performFailure: ActionResult? = null
         var latest = ScreenSnapshot("s0", PRIVATE_SCREEN, "Example", pkg)
         val actions = mutableListOf<PhoneAction>()
         var onObserve: () -> Unit = {}
@@ -20,7 +24,8 @@ class PhoneRoutineFailureTest {
         var onConfirm: () -> Unit = {}
         var onStatus: (String?) -> Unit = {}
         private fun snapshot(): ScreenSnapshot {
-            latest = ScreenSnapshot("s${++serial}", "屏幕 s$serial\n$PRIVATE_SCREEN", "Example", pkg)
+            latest = ScreenSnapshot("s${++serial}", "屏幕 s$serial\n$PRIVATE_SCREEN", "Example", pkg,
+                visibleTexts = visibleTexts, observationReason = observationReason)
             return latest
         }
         private val driver = object : PhoneDriver {
@@ -32,6 +37,8 @@ class PhoneRoutineFailureTest {
                 onObserve()
                 return snapshot()
             }
+            override fun reusableSnapshot(screenId: String): ScreenSnapshot? =
+                latest.takeIf { allowReuse && it.id == screenId }
             override fun find(screenId: String, text: String): Either<String, Int> {
                 assertEquals(latest.id, screenId)
                 return Either.Right(if (text == "Name") 1 else 2)
@@ -44,6 +51,7 @@ class PhoneRoutineFailureTest {
                 assertEquals(latest.id, action.screenId)
                 actions += action
                 onPerform()
+                performFailure?.let { return it }
                 return ActionResult(true, "done", snapshot())
             }
             override fun collect(screenId: String, listElementId: Int, maxPages: Int, until: String?) = error("unused")
@@ -74,6 +82,51 @@ class PhoneRoutineFailureTest {
     private fun progress(out: ToolOutput) = Json.parse(out.text.substringBefore("\n\n")) as Map<*, *>
     private fun writes() = listOf(step("tap", "target" to "Continue"),
         step("type", "target" to "Name", "text" to PRIVATE_INPUT), step("tap", "target" to "Continue"))
+
+    @Test fun assertionUsesVisibleTargetsInsteadOfTheFormattedTextTree() {
+        Fixture().use { f ->
+            f.visibleTexts = listOf("visible record 28")
+            val out = f.run(listOf(step("assert", "text" to PRIVATE_SCREEN)))
+            assertTrue(out.isError)
+            assertEquals("assertion", progress(out)["reason"])
+            assertTrue(f.actions.isEmpty())
+        }
+    }
+
+    @Test fun unavailableObservationDoesNotPretendTheApplicationChanged() {
+        Fixture().use { f ->
+            f.observationReason = "root-unavailable"
+            val out = f.run(writes())
+            assertTrue(out.isError)
+            assertEquals("root-unavailable", progress(out)["reason"])
+            assertTrue(f.actions.isEmpty())
+        }
+    }
+
+    @Test fun driverFailureCodeIsKeptInTheRoutineTrace() {
+        Fixture().use { f ->
+            f.performFailure = ActionResult(false, "target disabled", reasonCode = "target-disabled")
+            val out = f.run(writes())
+            assertEquals("target-disabled", progress(out)["reason"])
+            assertEquals("target-disabled", ((progress(out)["trace"] as List<*>).single() as Map<*, *>)["decision"])
+            assertEquals(1, f.actions.size)
+        }
+    }
+
+    @Test fun onlyDriverVerifiedFreshObservationsAvoidRedundantReads() {
+        val reads = mutableListOf<Int>()
+        for (reuse in listOf(false, true)) Fixture().use { f ->
+            f.allowReuse = reuse
+            val out = f.run(writes())
+            assertFalse(out.isError)
+            assertEquals(3, f.actions.size)
+            val result = progress(out)
+            assertEquals(f.reads.toLong(), result["observations"])
+            assertTrue((result["elapsedMs"] as Number).toLong() >= 0)
+            reads += f.reads
+        }
+        assertTrue("verified reuse must reduce total observations", reads[1] < reads[0])
+    }
 
     @Test fun injectionExceptionsPreserveProgressWithoutReplayingOrDisclosingExceptionDetails() {
         for (interrupt in listOf(false, true)) Fixture().use { f ->

@@ -2942,6 +2942,366 @@ abstract class L10n {
   /// **'、'**
   String get activityToolListSeparator;
 
+  /// No description provided for @automationTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动任务'**
+  String get automationTitle;
+
+  /// No description provided for @automationSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'保存成功流程，填写参数后重复运行'**
+  String get automationSubtitle;
+
+  /// No description provided for @automationUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'自动任务模块尚未就绪，请检查应用版本'**
+  String get automationUnavailable;
+
+  /// No description provided for @automationGlobal.
+  ///
+  /// In zh, this message translates to:
+  /// **'全局自动模式'**
+  String get automationGlobal;
+
+  /// No description provided for @automationGlobalHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'在已批准范围内免运行确认，重启后保留'**
+  String get automationGlobalHint;
+
+  /// No description provided for @automationGlobalConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启后，已批准范围内的任务可直接运行，直到你手动关闭。应用限制、参数范围和任务终点继续有效。'**
+  String get automationGlobalConfirm;
+
+  /// No description provided for @automationImport.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入任务定义'**
+  String get automationImport;
+
+  /// No description provided for @automationImportHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'粘贴 AI 生成的任务 JSON；导入后先审核，不会立即运行'**
+  String get automationImportHint;
+
+  /// No description provided for @automationInvalidJson.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入完整的 JSON 对象'**
+  String get automationInvalidJson;
+
+  /// No description provided for @automationReview.
+  ///
+  /// In zh, this message translates to:
+  /// **'审核待保存任务'**
+  String get automationReview;
+
+  /// No description provided for @automationApps.
+  ///
+  /// In zh, this message translates to:
+  /// **'任务允许使用的应用'**
+  String get automationApps;
+
+  /// No description provided for @automationReviewHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'请核对应用、动作和完成条件，再决定保存及授权范围。保存不代表任务已通过真机验证。'**
+  String get automationReviewHint;
+
+  /// No description provided for @automationDefinition.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看完整流程与限制'**
+  String get automationDefinition;
+
+  /// No description provided for @automationAllowedValues.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许免确认的值，每行一个'**
+  String get automationAllowedValues;
+
+  /// No description provided for @automationAnyValue.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许此字段使用任意符合定义的值'**
+  String get automationAnyValue;
+
+  /// No description provided for @automationScopeRequired.
+  ///
+  /// In zh, this message translates to:
+  /// **'填写允许的值，或明确选择允许任意值'**
+  String get automationScopeRequired;
+
+  /// No description provided for @automationAlways.
+  ///
+  /// In zh, this message translates to:
+  /// **'长期授权'**
+  String get automationAlways;
+
+  /// No description provided for @automationAlwaysHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'此版本及已批准参数范围内免再次运行确认'**
+  String get automationAlwaysHint;
+
+  /// No description provided for @automationEach.
+  ///
+  /// In zh, this message translates to:
+  /// **'每次确认'**
+  String get automationEach;
+
+  /// No description provided for @automationSave.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认保存'**
+  String get automationSave;
+
+  /// No description provided for @automationConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认'**
+  String get automationConfirm;
+
+  /// No description provided for @automationScopeConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'参数超出原授权范围'**
+  String get automationScopeConfirm;
+
+  /// No description provided for @automationScopeConfirmHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'是否仅为这次运行批准以下参数？不会扩大已保存的长期授权范围。'**
+  String get automationScopeConfirmHint;
+
+  /// No description provided for @automationRefresh.
+  ///
+  /// In zh, this message translates to:
+  /// **'刷新任务'**
+  String get automationRefresh;
+
+  /// No description provided for @automationProposals.
+  ///
+  /// In zh, this message translates to:
+  /// **'待审核任务'**
+  String get automationProposals;
+
+  /// No description provided for @automationSaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'已保存任务'**
+  String get automationSaved;
+
+  /// No description provided for @automationEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'还没有保存任务'**
+  String get automationEmpty;
+
+  /// No description provided for @automationEmptyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'让 AI 完成流程后建议保存，或导入任务定义。点击任务可填写参数并启动。'**
+  String get automationEmptyHint;
+
+  /// No description provided for @automationDisabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'已禁用'**
+  String get automationDisabled;
+
+  /// No description provided for @automationDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除任务'**
+  String get automationDelete;
+
+  /// No description provided for @automationDeleteHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除后，聊天和任务页都无法再次启动它。正在运行的任务需要先停止。'**
+  String get automationDeleteHint;
+
+  /// No description provided for @automationEnable.
+  ///
+  /// In zh, this message translates to:
+  /// **'启用任务'**
+  String get automationEnable;
+
+  /// No description provided for @automationDisable.
+  ///
+  /// In zh, this message translates to:
+  /// **'禁用任务'**
+  String get automationDisable;
+
+  /// No description provided for @automationRuns.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行状态与最近结果'**
+  String get automationRuns;
+
+  /// No description provided for @automationProgress.
+  ///
+  /// In zh, this message translates to:
+  /// **'已完成步骤'**
+  String get automationProgress;
+
+  /// No description provided for @automationRepairs.
+  ///
+  /// In zh, this message translates to:
+  /// **'修复'**
+  String get automationRepairs;
+
+  /// No description provided for @automationAiCalls.
+  ///
+  /// In zh, this message translates to:
+  /// **'AI 检查点'**
+  String get automationAiCalls;
+
+  /// No description provided for @automationPause.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂停'**
+  String get automationPause;
+
+  /// No description provided for @automationResume.
+  ///
+  /// In zh, this message translates to:
+  /// **'继续'**
+  String get automationResume;
+
+  /// No description provided for @automationRunning.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行中'**
+  String get automationRunning;
+
+  /// No description provided for @automationPaused.
+  ///
+  /// In zh, this message translates to:
+  /// **'已暂停'**
+  String get automationPaused;
+
+  /// No description provided for @automationAwaitingAi.
+  ///
+  /// In zh, this message translates to:
+  /// **'等待 AI'**
+  String get automationAwaitingAi;
+
+  /// No description provided for @automationAwaitingAiHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'任务正在请求 AI 判断，等待期间不会继续点击；可随时停止。'**
+  String get automationAwaitingAiHint;
+
+  /// No description provided for @automationCompleted.
+  ///
+  /// In zh, this message translates to:
+  /// **'已完成'**
+  String get automationCompleted;
+
+  /// No description provided for @automationStopped.
+  ///
+  /// In zh, this message translates to:
+  /// **'已停止'**
+  String get automationStopped;
+
+  /// No description provided for @automationInterrupted.
+  ///
+  /// In zh, this message translates to:
+  /// **'已中断，需核查现场'**
+  String get automationInterrupted;
+
+  /// No description provided for @automationRequired.
+  ///
+  /// In zh, this message translates to:
+  /// **'此项必填'**
+  String get automationRequired;
+
+  /// No description provided for @automationInvalidValue.
+  ///
+  /// In zh, this message translates to:
+  /// **'参数不符合类型、范围或允许值'**
+  String get automationInvalidValue;
+
+  /// No description provided for @automationRun.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认运行'**
+  String get automationRun;
+
+  /// No description provided for @automationRunHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'核对本次参数后启动；沿用已批准的应用、动作和完成条件。'**
+  String get automationRunHint;
+
+  /// No description provided for @automationElapsed.
+  ///
+  /// In zh, this message translates to:
+  /// **'主动耗时'**
+  String get automationElapsed;
+
+  /// No description provided for @automationCheckpoint.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前检查点'**
+  String get automationCheckpoint;
+
+  /// No description provided for @automationRunOnce.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅运行本次'**
+  String get automationRunOnce;
+
+  /// No description provided for @automationRunOnceHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'核对本次应用、完整流程和参数。只授权这一次运行，不保存任务，也不授予长期权限；成功后可再决定保存。'**
+  String get automationRunOnceHint;
+
+  /// No description provided for @automationEvidence.
+  ///
+  /// In zh, this message translates to:
+  /// **'本机截图证据'**
+  String get automationEvidence;
+
+  /// No description provided for @automationEvidenceHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认关闭；每次最多10张，总计50MB，保留7天，可查看和清理'**
+  String get automationEvidenceHint;
+
+  /// No description provided for @automationEvidenceConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'开启后保存任务关键步骤截图到本机，截图可能含私人内容，不会自动外发。每次最多10张，总计50MB，保留7天；关闭不删除已有截图，可另行清理。'**
+  String get automationEvidenceConfirm;
+
+  /// No description provided for @automationClearEvidence.
+  ///
+  /// In zh, this message translates to:
+  /// **'清理截图证据'**
+  String get automationClearEvidence;
+
+  /// No description provided for @automationClearEvidenceHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除本机保存的全部任务截图，不删除任务及文字结果。此操作无法撤回。'**
+  String get automationClearEvidenceHint;
+
+  /// No description provided for @automationEvidenceUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'截图不存在或无法读取'**
+  String get automationEvidenceUnavailable;
+
   /// No description provided for @botsFolderGone.
   ///
   /// In zh, this message translates to:

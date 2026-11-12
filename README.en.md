@@ -2,6 +2,8 @@
   <a href="README.md">简体中文</a> · <b>English</b>
 </p>
 
+> **1.0.17 automation candidate** adds local conditions, bounded loops, one-time runs, reviewed task saving and parameter reuse, plus optional local screenshot evidence. See the [saved task guide](docs/guide/en/04-phone-control.md#saved-phone-tasks) and [candidate changelog](docs/changelog.md#1017--2026-11-12-候选--candidate). This work did not install the app or validate it on a real phone.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-en-dark.webp">

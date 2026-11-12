@@ -32,6 +32,7 @@ import io.github.ccch1mneyyy.dsh_app.phone.SafetyRules
 import io.github.ccch1mneyyy.dsh_app.phone.ScreenSnapshot
 import io.github.ccch1mneyyy.dsh_app.phone.TargetInfo
 import io.github.ccch1mneyyy.dsh_app.phone.TextSelector
+import io.github.ccch1mneyyy.dsh_app.phone.TargetLookup
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -73,13 +74,16 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         val appLabel: String?,
         val protectedPage: Boolean,
         val ownApp: Boolean,
-        /** The front window hides its content from us (data-sensitive page): reported as secure. */
+        /** Front root missing; this alone does not establish screenshot protection. */
         val hidden: Boolean,
         /** The window is there but nothing under it was readable (filtered subtree, page still drawing). */
         val unreadable: Boolean,
         val observation: ScreenObservation,
         /** Notes already shown on this app's previous screen (not repeated). */
         val noteKeys: Set<String>,
+        val visibleTexts: List<String>,
+        val eventCount: Long,
+        val observedAt: Long,
     ) {
         @Volatile var image: ImageGeometry? = null
     }
@@ -145,7 +149,8 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
                     }
                 }
             }
-            ScreenSnapshot(snap.id, text.toString(), snap.appLabel, snap.packageName, secure || snap.hidden, snap.screen.poorTree, bytes, mime)
+            toSnapshot(snap, text.toString()).copy(secure = secure, image = bytes, imageMime = mime,
+                observationReason = if (secure) "screenshot-protected" else observationReason(snap))
         } finally { cap.recycle() }
     }
 
@@ -157,6 +162,14 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         val cap = capture()
         try { if (locate(cap, el) == null) return null } finally { cap.recycle() }
         info(screenId, el)
+    }
+
+    override fun reusableSnapshot(screenId: String): ScreenSnapshot? = synchronized(lock) {
+        val snap = latest ?: return null
+        if (snap.id != screenId || !availability().ok || clock.count != snap.eventCount ||
+            SystemClock.uptimeMillis() - snap.observedAt > 250 || snap.observation.unavailable ||
+            snap.observation.incomplete) return null
+        toSnapshot(snap)
     }
 
     /** [el] as the core and the gate see it. */
@@ -262,7 +275,7 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
                     // Nothing readable in front: this says "cannot read" instead of blaming the list.
                     if (unavailable(cap)) {
                         // l10n:keep agent screen result
-                        stop = "这一屏读不到内容（可能受敏感视图策略限制）"
+                        stop = "当前无障碍观察不可用，原因尚未确认"
                         break
                     }
                     val list = ScreenFormat.followList(ScreenFormat.index(cap.windows), el.fingerprint, lastBounds)
@@ -318,18 +331,23 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
             val msg = if (snap == null) "还没有读过屏幕，先用 screen 看一下。"
             // l10n:keep agent screen result
             else "屏幕编号 $screenId 过期了（最新 ${now?.id ?: snap.id}），没有执行。按新屏幕的编号来。"
-            return ActionResult(false, msg, now)
+            return ActionResult(false, msg, now, reasonCode = "observation-stale")
         }
         val el = snap.screen.element(elementId)
             // l10n:keep agent screen result
-            ?: return ActionResult(false, "屏幕 $screenId 里没有编号 $elementId（共 ${snap.screen.elements.size} 项）。")
+            ?: return ActionResult(false, "屏幕 $screenId 里没有编号 $elementId（共 ${snap.screen.elements.size} 项）。", reasonCode = "target-missing")
         val cap = capture()
         val hit = locate(cap, el)
         val node = hit?.let { cap.native(it.ref) }
         if (hit == null || node == null) {
             val now = try { publish(cap, false).let { toSnapshot(it) } } finally { cap.recycle() }
             // l10n:keep agent screen result
-            return ActionResult(false, "目标 [$elementId]「${short(el.label.ifEmpty { el.role })}」变了，没有执行；看新屏幕再选。", now)
+            val code = if (now.observationReason != null) "observation-unavailable" else "target-changed"
+            return ActionResult(false, "目标 [$elementId]「${short(el.label.ifEmpty { el.role })}」已不在原来的可见位置，或页面目标已变化，没有执行；看新屏幕再选。", now, reasonCode = code)
+        }
+        if (!node.isEnabled) {
+            cap.recycle()
+            return ActionResult(false, "目标 [$elementId] 当前不可用，没有执行。", reasonCode = "target-disabled")
         }
         return Resolved(snap, el, cap, node, hit)
     }
@@ -426,9 +444,9 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
                 // l10n:keep agent screen result
                 if (cap.ownAppInFront && !lifted.ownApp) return ActionResult(false, "这是 DSH 自己的界面，不操作。")
                 // l10n:keep agent screen result
-                if (unavailable(cap)) return ActionResult(false, "这一屏读不到内容（可能受敏感视图策略限制），不盲滑。请 handoff。", toSnapshot(publish(cap, false)))
+                if (unavailable(cap)) return ActionResult(false, "当前无障碍观察没有提供可用滚动目标，未确认系统保护；请用 screen 加 image 核查后再操作。", toSnapshot(publish(cap, false)))
                 // l10n:keep agent screen result
-                if (!observation(cap).reusableCoordinates(snap.observation)) return ActionResult(false, "无法确认当前界面仍与上一屏一致，没有滚动。请先看新屏幕。", toSnapshot(publish(cap, false)))
+                if (!reusableCoordinates(cap, snap)) return ActionResult(false, "无法确认当前界面仍与上一屏一致，没有滚动。请先看新屏幕。", toSnapshot(publish(cap, false)))
                 val screen = cap.screen
                 val before = clock.count
                 val out = actuator.scroll(null, 0, a.direction == PhoneAction.Direction.LEFT || a.direction == PhoneAction.Direction.RIGHT,
@@ -487,13 +505,13 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         // l10n:keep agent screen result
         if (snap.protectedPage && !lifted.systemPages) return ActionResult(false, "这是系统权限 / 安全相关页面，DSH 不在这里点击。需要的话请用 handoff 交给用户。")
         // l10n:keep agent screen result
-        if (snap.hidden || snap.unreadable) return ActionResult(false, "这一屏读不到内容（可能受敏感视图策略限制），不盲点。请 handoff。", observeQuiet())
+        if (snap.hidden) return ActionResult(false, "当前无障碍根节点不可用，无法确认前台窗口，没有点击。请重新观察。", observeQuiet(), reasonCode = "observation-unavailable")
         val cap = capture()
         try {
             // l10n:keep agent screen result
-            if (unavailable(cap)) return ActionResult(false, "这一屏读不到内容（可能受敏感视图策略限制），不盲点。请 handoff。", toSnapshot(publish(cap, false)))
+            if (cap.hiddenWindowTitle != null || cap.windows.isEmpty()) return ActionResult(false, "当前窗口观察不可用，原因尚未确认，没有操作。请重新观察。", toSnapshot(publish(cap, false)), reasonCode = "observation-unavailable")
             // l10n:keep agent screen result
-            if (!observation(cap).reusableCoordinates(snap.observation)) return ActionResult(false, "无法确认当前界面仍与截图一致，没有点击。请重新看屏幕。", toSnapshot(publish(cap, false)))
+            if (!reusableCoordinates(cap, snap)) return ActionResult(false, "无法确认当前界面仍与截图一致，没有点击。请重新看屏幕。", toSnapshot(publish(cap, false)))
         } finally { cap.recycle() }
         val before = clock.count
         // l10n:keep agent screen result
@@ -531,13 +549,13 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         // l10n:keep agent screen result
         if (snap.protectedPage && !lifted.systemPages) return ActionResult(false, "这是系统权限 / 安全相关页面，DSH 不在这里做手势。需要的话请用 handoff 交给用户。")
         // l10n:keep agent screen result
-        if (snap.hidden || snap.unreadable) return ActionResult(false, "这一屏读不到内容（可能受敏感视图策略限制），不盲做手势。请 handoff。", observeQuiet())
+        if (snap.hidden) return ActionResult(false, "当前无障碍根节点不可用，无法确认前台窗口，没有做手势。请重新观察。", observeQuiet(), reasonCode = "observation-unavailable")
         val cap = capture()
         try {
             // l10n:keep agent screen result
-            if (unavailable(cap)) return ActionResult(false, "这一屏读不到内容（可能受敏感视图策略限制），不盲做手势。请 handoff。", toSnapshot(publish(cap, false)))
+            if (cap.hiddenWindowTitle != null || cap.windows.isEmpty()) return ActionResult(false, "当前窗口观察不可用，原因尚未确认，没有操作。请重新观察。", toSnapshot(publish(cap, false)), reasonCode = "observation-unavailable")
             // l10n:keep agent screen result
-            if (!observation(cap).reusableCoordinates(snap.observation)) return ActionResult(false, "无法确认当前界面仍与截图一致，没有做手势。请重新看屏幕。", toSnapshot(publish(cap, false)))
+            if (!reusableCoordinates(cap, snap)) return ActionResult(false, "无法确认当前界面仍与截图一致，没有做手势。请重新看屏幕。", toSnapshot(publish(cap, false)))
         } finally { cap.recycle() }
         val before = clock.count
         // l10n:keep agent screen result
@@ -551,14 +569,19 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
      * A tie is a refusal — the model names one by id — never a guess.
      */
     override fun find(screenId: String, text: String): Either<String, Int> {
+        val result = lookup(screenId, text)
+        return result.elementId?.let { Either.Right(it) } ?: Either.Left(result.message ?: "没有找到目标。")
+    }
+
+    override fun lookup(screenId: String, text: String): TargetLookup = synchronized(lock) {
         val snap = latest
         if (snap == null || snap.id != screenId) {
             val now = observeQuiet()
             // l10n:keep agent screen result
-            return Either.Left(
+            return TargetLookup(null,
                 if (snap == null) "还没有读过屏幕，先用 screen 看一下。"
                 // l10n:keep agent screen result
-                else "屏幕编号 $screenId 过期了（最新 ${now?.id ?: snap.id}），没有操作。按新屏幕上的文字再试。",
+                else "屏幕编号 $screenId 过期了（最新 ${now?.id ?: snap.id}），没有操作。按新屏幕上的文字再试。", "observation-stale",
             )
         }
         val candidates = snap.screen.elements.map { el ->
@@ -571,9 +594,15 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
             )
         }
         return when (val hit = TextSelector.pick(text, candidates)) {
-            is TextSelector.Hit.One -> Either.Right(hit.id)
-            is TextSelector.Hit.Fail -> Either.Left(hit.message)
+            is TextSelector.Hit.One -> TargetLookup(hit.id)
+            is TextSelector.Hit.Fail -> TargetLookup(null, hit.message, hit.reasonCode)
         }
+    }
+
+    override fun select(screenId: String, selector: Map<String, Any?>): TargetLookup = synchronized(lock) {
+        val snap = latest
+        if (snap == null || snap.id != screenId) return TargetLookup(null, "观察编号已过期，请重新读取屏幕。", "observation-stale")
+        ElementSelector.pick(selector, snap.screen.elements)
     }
 
     /**
@@ -600,13 +629,13 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         // l10n:keep agent screen result
         if (snap.protectedPage && !lifted.systemPages) return ActionResult(false, "这是系统权限 / 安全相关页面，DSH 不在这里输入。需要的话请用 handoff 交给用户。")
         // l10n:keep agent screen result
-        if (snap.hidden || snap.unreadable) return ActionResult(false, "这一屏读不到内容（可能受敏感视图策略限制），不盲输。请 handoff。", observeQuiet())
+        if (snap.hidden) return ActionResult(false, "当前无障碍根节点不可用，无法确认前台窗口，没有输入。请重新观察。", observeQuiet(), reasonCode = "observation-unavailable")
         val cap = capture()
         try {
             // l10n:keep agent screen result
-            if (unavailable(cap)) return ActionResult(false, "这一屏读不到内容（可能受敏感视图策略限制），不盲输。请 handoff。", toSnapshot(publish(cap, false)))
+            if (cap.hiddenWindowTitle != null || cap.windows.isEmpty()) return ActionResult(false, "当前窗口观察不可用，原因尚未确认，没有操作。请重新观察。", toSnapshot(publish(cap, false)), reasonCode = "observation-unavailable")
             // l10n:keep agent screen result
-            if (!observation(cap).reusableCoordinates(snap.observation)) return ActionResult(false, "无法确认当前界面仍与截图一致，没有输入。请重新看屏幕。", toSnapshot(publish(cap, false)))
+            if (!reusableCoordinates(cap, snap)) return ActionResult(false, "无法确认当前界面仍与截图一致，没有输入。请重新看屏幕。", toSnapshot(publish(cap, false)))
         } finally {
             cap.recycle()
         }
@@ -779,9 +808,20 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
 
     // ---- snapshots --------------------------------------------------------------------------------
 
-    private fun capture(): Capture = TreeCapture.capture(service, screenBox(), ownPackage, CAPTURE_MS)
+    private fun capture(): Capture = TreeCapture.capture(service, screenBox(), ownPackage, CAPTURE_MS, clock.count)
 
     private fun unavailable(cap: Capture) = WindowContent.unavailable(cap.hiddenWindowTitle != null, cap.unreadableWindowTitle != null, cap.windows)
+
+    /** An empty tree is not a policy refusal; a fresh screenshot still binds a stable window. */
+    private fun reusableCoordinates(cap: Capture, snap: Snapshot): Boolean {
+        val now = observation(cap)
+        if (now.reusableCoordinates(snap.observation)) return true
+        return snap.image != null && !snap.hidden && cap.hiddenWindowTitle == null &&
+            !now.incomplete && !snap.observation.incomplete &&
+            clock.count == snap.eventCount && SystemClock.uptimeMillis() - snap.observedAt <= 5_000 &&
+            now.keyboardShown != null && now.keyboardShown == snap.observation.keyboardShown &&
+            now.sameContext(snap.observation) && now.elements == snap.observation.elements
+    }
 
     private fun observation(cap: Capture) = ScreenObservation(
         cap.packageName, cap.windows, cap.screen, cap.keyboardShown, unavailable(cap), cap.truncated || cap.partial,
@@ -815,12 +855,12 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         if (cap.hiddenWindowTitle != null) {
             val name = cap.hiddenWindowTitle.takeIf { it.isNotBlank() }?.let { "「$it」" } ?: ""
             // l10n:keep agent screen result
-            note("hidden", "提示：当前无法读取前台页面${name}（可能受敏感视图策略限制）。读不到也点不了，需要就 handoff。")
+            note("hidden", "提示：没有取得前台页面${name}的无障碍根节点，原因尚未确认；这不代表系统已禁止截图。可尝试重新读取或 screen 加 image 核查。")
         // l10n:keep agent screen result
         } else if (cap.unreadableWindowTitle != null) {
             val name = cap.unreadableWindowTitle.takeIf { it.isNotBlank() }?.let { "「$it」" } ?: ""
             // l10n:keep agent screen result
-            note("unreadable", "提示：当前无法读取这一屏${name}的有效内容，可能受敏感视图策略限制（Android 14 起密码、支付、验证页会被系统过滤）。读不到也点不了；能看图的模型可以 screen 加 image，否则请 handoff。")
+            note("unreadable", "提示：这一屏${name}的无障碍树没有提供可用目标，原因尚未确认。截图是否可用单独检查；能看图的模型可以 screen 加 image，否则请 handoff。")
         // l10n:keep agent screen result
         } else if (cap.windows.isEmpty()) note("empty", "提示：读不到前台界面（可能是锁屏、安全页面或系统界面）。")
         val previous = latest?.takeIf { it.packageName == pkg }?.screen?.keys
@@ -845,13 +885,23 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         val snap = Snapshot(
             id, formatted, pkg, appLabel, protectedPage, cap.ownAppInFront,
             cap.hiddenWindowTitle != null, cap.unreadableWindowTitle != null, observation(cap), noteKeys,
+            ScreenFormat.index(cap.windows).filter { it.kind != ElementKind.LIST }.map { it.fullText },
+            cap.eventCount, cap.takenAt,
         )
         latest = snap
         return snap
     }
 
+    private fun observationReason(s: Snapshot): String? = when {
+        s.hidden -> "root-unavailable"
+        s.unreadable -> "tree-unavailable"
+        s.observation.unavailable -> "observation-unavailable"
+        else -> null
+    }
+
     private fun toSnapshot(s: Snapshot, text: String = s.screen.text) =
-        ScreenSnapshot(s.id, text, s.appLabel, s.packageName, secure = s.hidden, poorTree = s.screen.poorTree)
+        ScreenSnapshot(s.id, text, s.appLabel, s.packageName, poorTree = s.screen.poorTree,
+            visibleTexts = s.visibleTexts, observationReason = observationReason(s))
 
     /** A fresh text snapshot for an action result; null when the screen can't be read now. */
     private fun observeQuiet(): ScreenSnapshot? {

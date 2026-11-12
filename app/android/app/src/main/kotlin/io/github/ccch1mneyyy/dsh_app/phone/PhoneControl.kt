@@ -132,9 +132,12 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
     override fun uiText(): PhoneUiText = localizedUi
 
     val core = PhoneCore(this, tasks, log)
+    private val automation by lazy {
+        AutomationHost(File(app.filesDir, "phone-automation"), core, tasks, this, ::emitStatus)
+    }
     val notificationGate = NotificationGate(app) { setStatusLine(it) }
     val prompts = PhonePrompts(app, tasks, ::isEnabled, ::isLocked, notificationGate, ::reopen)
-    private val server = McpServer(PhoneToolCatalog.listJson(), core::call, SERVER_VERSION)
+    private val server = McpServer(PhoneToolCatalog.listJson(), ::phoneTool, SERVER_VERSION)
     private val bridge = PhoneBridge(server) { line -> logger(line) }
 
     @Volatile private var logger: (String) -> Unit = {}
@@ -164,6 +167,23 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
 
     fun isEnabled(): Boolean = switchedOn(app)
 
+    private fun phoneTool(name: String, args: Map<String, Any?>): ToolOutput {
+        if (name == PhoneToolCatalog.TASK) {
+            val action = args["action"] as? String ?: return ToolOutput("missing-action", isError = true)
+            val result = automation.request(action, args - "action", trusted = false)
+            return ToolOutput(Json.write(result), isError = result["ok"] == false)
+        }
+        if (automation.active) {
+            if (name == PhoneToolCatalog.SCREEN) return automation.read(args)
+            if (name != PhoneToolCatalog.APPS)
+                return ToolOutput("automation-busy: 使用 task 查询状态或提交当前 checkpoint 的受限步骤；直接写操作不会执行。", isError = true)
+        }
+        return core.call(name, args)
+    }
+
+    fun automationRequest(action: String, args: Map<String, Any?>): Map<String, Any?> =
+        automation.request(action, args, trusted = true)
+
     /** Off closes the bridge and stops the task after any in-flight keeper settings write.
      * On needs an engine restart (the UI does it); the rebind gap never holds this switch.
      */
@@ -172,6 +192,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
             prefs.edit().putBoolean(K_ENABLED, enabled).apply()
         }
         if (!enabled) {
+            automation.stop()
             // l10n:keep agent stop reason
             tasks.stop("手机操控已关闭")
             stopBridge()
@@ -288,6 +309,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
     }
 
     fun onEngineStopped() {
+        automation.pause()
         tasks.invalidateOwners()
         stopBridge()
         core.worker.retire()
@@ -306,6 +328,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
     // ── Task ────────────────────────────────────────────────────────────────────────
 
     fun stopTask(reason: String): Boolean {
+        automation.stop()
         tasks.stop(reason)
         return true
     }
@@ -316,11 +339,13 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
      * phone call still runs, or the requested task changed. Any thread.
      */
     fun finishTask(expectedTaskId: Long? = null): Boolean {
+        if (automation.active) return false
         val taskId = expectedTaskId ?: tasks.snapshot().id
         return tasks.finish(taskId)
     }
 
-    fun finishTaskScope(expectedTaskId: Long): PhoneTasks.Owner? = tasks.finishScope(expectedTaskId)
+    fun finishTaskScope(expectedTaskId: Long): PhoneTasks.Owner? =
+        if (automation.active) null else tasks.finishScope(expectedTaskId)
 
     /**
      * Brings the app forward on [sessionId] (just the app when null) after a finished task. Started
@@ -557,6 +582,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
     /** Every 2 s: end idle tasks; 自动恢复无障碍; push status changes we can't observe (accessibility connecting). */
     private fun tick() {
         try {
+            automation.tick()
             tasks.expireIdle()
             A11yKeeper.check(app)
             pushIfChanged(force = false)
@@ -566,9 +592,28 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
 
     // ── ControlListener (the overlay's 暂停 / 停止 / 插话, the service's own stops) ──
 
-    override fun onPauseChanged(paused: Boolean) = tasks.setPaused(paused)
+    override fun onPauseChanged(paused: Boolean) {
+        if (automation.active) {
+            if (paused) automation.pause() else automation.resume()
+        } else tasks.setPaused(paused)
+    }
+
+    override fun onUserInteraction() {
+        if (automation.active) {
+            automation.pause()
+            tasks.setPaused(true)
+        }
+    }
 
     override fun onStopRequested(reason: String) {
+        if (automation.active) {
+            if (reason == "熄屏" || isLocked() || a11yState() != A11yState.CONNECTED) {
+                automation.pause()
+                tasks.setPaused(true)
+                return
+            }
+            automation.stop()
+        }
         // The service also reports screen off / service gone while idle: only a running task stops.
         if (tasks.snapshot().active) tasks.stop(reason) else tasks.invalidateOwners()
     }

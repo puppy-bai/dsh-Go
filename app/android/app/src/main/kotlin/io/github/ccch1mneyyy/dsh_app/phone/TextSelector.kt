@@ -25,7 +25,7 @@ object TextSelector {
     sealed interface Hit {
         data class One(val id: Int, val label: String) : Hit
         /** The sentence for the model, plus what was found so the next try can be precise. */
-        data class Fail(val message: String, val candidates: List<Candidate> = emptyList()) : Hit
+        data class Fail(val message: String, val candidates: List<Candidate> = emptyList(), val reasonCode: String = "target-missing") : Hit
     }
 
     private val space = Regex("\\s+")
@@ -82,6 +82,6 @@ object TextSelector {
         val pool = if (acts.isNotEmpty()) acts else hit
         if (pool.size == 1) return Hit.One(pool.first().id, pool.first().label)
         // l10n:keep agent tool result
-        return Hit.Fail("「$query」匹配到 ${pool.size} 个元素，无法确定点哪个。用 id 指定：${list(pool, limit)}。", pool)
+        return Hit.Fail("「$query」匹配到 ${pool.size} 个元素，无法确定点哪个。用 id 指定：${list(pool, limit)}。", pool, "target-ambiguous")
     }
 }

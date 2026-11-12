@@ -24,6 +24,7 @@ object PhoneToolCatalog {
     const val GESTURE = "gesture"
     const val INPUT = "input"
     const val RUN = "run"
+    const val TASK = "task"
     const val HANDOFF = "handoff"
 
     class Tool(val name: String, val description: String, val properties: Map<String, Any?>, val required: List<String>) {
@@ -318,6 +319,22 @@ object PhoneToolCatalog {
                 "startAt" to int("从第几步开始，默认1；恢复必须先读屏，并给该步 requireText，不能盲重放"),
             ),
             listOf("app", "steps"),
+        ),
+        Tool(
+            TASK,
+            // l10n:keep agent tool catalog
+            "本地可复用自动任务。action=list/get/validate/propose/start/status/pause/resume/stop/ai_result/repair。propose只提出保存候选，用户在任务页确认后才保存授权。start只运行已批准任务，授权或参数超范围返回needs_confirmation。步骤由本地连续执行；ai节点返回awaiting_ai与checkpoint，使用screen读取新页面后以ai_result提交受限steps或value，不能直接绕开任务写手机。repair整次最多2轮；结果不确定先查实况，禁止盲目重放发送/提交。schema=1；apps固定包名；parameters字段定义；steps支持open/tap/type/scroll/key(back)/wait/assert/if/repeat/set/read_text/ai/finish以及当前支持的视觉动作。先validate确认实际格式。task工具不能批准任务、改全局模式或扩大授权。",
+            linkedMapOf(
+                "action" to enum(listOf("list", "get", "validate", "propose", "start", "status", "pause", "resume", "stop", "ai_result", "repair"), "操作"),
+                "id" to str("任务ID"),
+                "definition" to linkedMapOf("type" to "object", "description" to "任务定义：schema:1,id,name,apps,parameters,steps,limits；先validate"),
+                "parameters" to linkedMapOf("type" to "object", "description" to "本次参数，必须落在用户批准范围"),
+                "runId" to str("运行标识"),
+                "checkpoint" to str("status返回的当前AI或修复检查点令牌"),
+                "steps" to array("AI节点后继续的有界步骤，不能扩大原应用和动作权限"),
+                "value" to linkedMapOf("description" to "AI节点结果值，按节点变量保存"),
+            ),
+            listOf("action"),
         ),
         Tool(
             HANDOFF,

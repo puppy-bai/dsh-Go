@@ -77,6 +77,8 @@ class ScreenElement(
     val key: String,
     /** Masked content and state, not just the stable action-target identity. */
     internal val observationKey: String = fingerprint,
+    val description: String? = null,
+    val enabled: Boolean = true,
 )
 
 class FormattedScreen(
@@ -117,9 +119,10 @@ object ScreenFormat {
     const val POOR_TREE_NOTE = "提示：本页文字很少（游戏、自绘界面常见）。能看图的模型可以 screen 加 image；否则请用户协助。"
 
     fun format(input: ScreenInput): FormattedScreen {
-        val textNodes = input.windows.sumOf { w -> w.root?.let(::countText) ?: 0 }
+        val visible = VisibleTree.windows(input.windows, Box(0, 0, input.screenWidth, input.screenHeight))
+        val textNodes = visible.sumOf { w -> w.root?.let(::countText) ?: 0 }
         val lines = mutableListOf<Line>()
-        val windows = input.windows.filter { it.root != null }
+        val windows = visible.filter { it.root != null }
         for ((index, window) in windows.withIndex()) {
             val items = flatten(window.root!!, window, null).sortedWith(compareBy({ it.node.bounds.top }, { it.node.bounds.left }))
             if (index < windows.size - 1) {
@@ -135,8 +138,7 @@ object ScreenFormat {
         val header = StringBuilder()
         val notes = input.notes.toMutableList()
         val poor = textNodes < POOR_TREE && windows.isNotEmpty()
-        // 读不到内容(大概率被敏感视图策略挡了)不能说成"游戏、自绘界面",那会把模型带到
-        // 另一个方向;这时 publish() 已经给了一条更准确的说明。
+        // An empty tree does not establish why observation failed; publish reports known facts.
         if (poor && !input.unreadable) notes += POOR_TREE_NOTE
 
         // Page budget: keep the 底部 zone (navigation) and cut the middle with a hint.
@@ -215,7 +217,7 @@ object ScreenFormat {
                 walk(item.subs)
             }
         }
-        for (window in windows) window.root?.let { walk(flatten(it, window, null)) }
+        for (window in VisibleTree.windows(windows)) window.root?.let { walk(flatten(it, window, null)) }
         return out
     }
 
@@ -225,7 +227,7 @@ object ScreenFormat {
         fun walk(items: List<Item>) {
             for (item in items) { out += item.observationKey(); walk(item.subs) }
         }
-        for (window in windows) window.root?.let { walk(flatten(it, window, null)) }
+        for (window in VisibleTree.windows(windows)) window.root?.let { walk(flatten(it, window, null)) }
         return out
     }
 
@@ -301,6 +303,7 @@ object ScreenFormat {
             clickable = node.clickable, longClickable = node.longClickable, editable = kind == ElementKind.INPUT,
             password = node.password, secret = secret, checkable = node.checkable, scroll = node.scroll,
             horizontal = horizontal, viewId = node.viewId, sensitiveWord = sensitive, listId = listId, parentId = parentId,
+            description = clean(node.desc), enabled = node.enabled,
             fingerprint = fingerprint(), key = key,
             observationKey = observationKey(),
         )

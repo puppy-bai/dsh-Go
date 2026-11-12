@@ -4,6 +4,19 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SafetyGateTest {
+    @Test fun refusedScreensAlsoRemoveStructuredVisibleText() {
+        val gate = SafetyGate({ PhonePolicies() }, PhoneTasks(), { null })
+        for (screen in listOf(
+            ScreenSnapshot("s1", "private", "DSH", SafetyRules.OWN_PACKAGE, visibleTexts = listOf("private")),
+            ScreenSnapshot("s2", "private", "Bank", "com.icbc", visibleTexts = listOf("private")),
+            ScreenSnapshot("s3", "private", "Example", "example.app", secure = true, visibleTexts = listOf("private")),
+        )) {
+            val filtered = gate.filterScreen(screen)
+            assertFalse(filtered.text.contains("private"))
+            assertEquals(emptyList<String>(), filtered.visibleTexts)
+        }
+    }
+
     private fun target(label: String = "打开", password: Boolean = false, secret: Boolean = false) =
         TargetInfo("s1", 1, "按钮", label, "example.app", "Example", password, secret, password || secret)
 

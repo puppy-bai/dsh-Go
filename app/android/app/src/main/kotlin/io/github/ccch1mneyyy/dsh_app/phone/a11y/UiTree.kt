@@ -38,7 +38,7 @@ object Scroll {
 }
 
 /** One accessibility node. [ref] indexes the capture's native node list (-1 in tests). */
-class UiNode(
+data class UiNode(
     val ref: Int = -1,
     val className: String = "",
     val text: String? = null,
@@ -82,6 +82,38 @@ class UiWindow(
     val bounds: Box,
     val root: UiNode?,
 )
+
+/** Clips descendants before their words can be merged into a visible clickable parent. */
+internal object VisibleTree {
+    fun windows(windows: List<UiWindow>, viewport: Box? = null): List<UiWindow> = windows.mapIndexed { index, window ->
+        val clip = viewport?.let(window.bounds::intersect) ?: window.bounds
+        val covering = windows.take(index).map { it.bounds }
+        val root = window.root?.let { visibleNode(it, clip, covering) }
+        if (root === window.root) window
+        // Keep physical window geometry for screenshot-to-display coordinate mapping.
+        else UiWindow(window.id, window.kind, window.packageName, window.title, window.bounds, root)
+    }
+
+    private fun visibleNode(node: UiNode, clip: Box, covering: List<Box>): UiNode? {
+        if (clip.isEmpty) return null
+        val visible = node.bounds.intersect(clip)
+        // Ordinary zero-size layout wrappers do not establish a clipping viewport.
+        val childClip = if (node.scrollable) visible else clip
+        val children = node.children.mapNotNull { visibleNode(it, childClip, covering) }
+        // A modal window can block node actions even when part of the underlying row shows.
+        // Keep uncovered descendants, but do not claim the overlapped node itself is a target.
+        val covered = covering.any { visible.intersect(it).area > 0 }
+        if (visible.isEmpty || covered) {
+            if (children.isEmpty()) return null
+            return node.copy(bounds = visible, text = null, desc = null, hint = null, viewId = null,
+                clickable = false, longClickable = false, editable = false, checkable = false,
+                children = children)
+        }
+        if (visible == node.bounds && children.size == node.children.size &&
+            children.indices.all { children[it] === node.children[it] }) return node
+        return node.copy(bounds = visible, children = children)
+    }
+}
 
 /**
  * collect's de-duplication: by text, in on-screen order. A row cut off at the list's edge

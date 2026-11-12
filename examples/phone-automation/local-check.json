@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "id": "local-check",
+  "name": "本地页面只读验收",
+  "apps": ["example.phone.lab"],
+  "steps": [
+    {"op": "snapshot"},
+    {"op": "wait", "text": "DSH 手机操控验收页", "timeoutMs": 10000},
+    {"op": "assert", "text": "DSH 手机操控验收页"},
+    {"op": "snapshot"},
+    {"op": "finish", "result": {"status": "verified", "note": "visible heading found"}}
+  ],
+  "limits": {"timeoutMs": 60000, "maxActions": 10, "maxAiCalls": 0}
+}

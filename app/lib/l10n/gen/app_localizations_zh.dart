@@ -1555,6 +1555,186 @@ class L10nZh extends L10n {
   String get activityToolListSeparator => '、';
 
   @override
+  String get automationTitle => '自动任务';
+
+  @override
+  String get automationSubtitle => '保存成功流程，填写参数后重复运行';
+
+  @override
+  String get automationUnavailable => '自动任务模块尚未就绪，请检查应用版本';
+
+  @override
+  String get automationGlobal => '全局自动模式';
+
+  @override
+  String get automationGlobalHint => '在已批准范围内免运行确认，重启后保留';
+
+  @override
+  String get automationGlobalConfirm => '开启后，已批准范围内的任务可直接运行，直到你手动关闭。应用限制、参数范围和任务终点继续有效。';
+
+  @override
+  String get automationImport => '导入任务定义';
+
+  @override
+  String get automationImportHint => '粘贴 AI 生成的任务 JSON；导入后先审核，不会立即运行';
+
+  @override
+  String get automationInvalidJson => '请输入完整的 JSON 对象';
+
+  @override
+  String get automationReview => '审核待保存任务';
+
+  @override
+  String get automationApps => '任务允许使用的应用';
+
+  @override
+  String get automationReviewHint => '请核对应用、动作和完成条件，再决定保存及授权范围。保存不代表任务已通过真机验证。';
+
+  @override
+  String get automationDefinition => '查看完整流程与限制';
+
+  @override
+  String get automationAllowedValues => '允许免确认的值，每行一个';
+
+  @override
+  String get automationAnyValue => '允许此字段使用任意符合定义的值';
+
+  @override
+  String get automationScopeRequired => '填写允许的值，或明确选择允许任意值';
+
+  @override
+  String get automationAlways => '长期授权';
+
+  @override
+  String get automationAlwaysHint => '此版本及已批准参数范围内免再次运行确认';
+
+  @override
+  String get automationEach => '每次确认';
+
+  @override
+  String get automationSave => '确认保存';
+
+  @override
+  String get automationConfirm => '确认';
+
+  @override
+  String get automationScopeConfirm => '参数超出原授权范围';
+
+  @override
+  String get automationScopeConfirmHint => '是否仅为这次运行批准以下参数？不会扩大已保存的长期授权范围。';
+
+  @override
+  String get automationRefresh => '刷新任务';
+
+  @override
+  String get automationProposals => '待审核任务';
+
+  @override
+  String get automationSaved => '已保存任务';
+
+  @override
+  String get automationEmpty => '还没有保存任务';
+
+  @override
+  String get automationEmptyHint => '让 AI 完成流程后建议保存，或导入任务定义。点击任务可填写参数并启动。';
+
+  @override
+  String get automationDisabled => '已禁用';
+
+  @override
+  String get automationDelete => '删除任务';
+
+  @override
+  String get automationDeleteHint => '删除后，聊天和任务页都无法再次启动它。正在运行的任务需要先停止。';
+
+  @override
+  String get automationEnable => '启用任务';
+
+  @override
+  String get automationDisable => '禁用任务';
+
+  @override
+  String get automationRuns => '运行状态与最近结果';
+
+  @override
+  String get automationProgress => '已完成步骤';
+
+  @override
+  String get automationRepairs => '修复';
+
+  @override
+  String get automationAiCalls => 'AI 检查点';
+
+  @override
+  String get automationPause => '暂停';
+
+  @override
+  String get automationResume => '继续';
+
+  @override
+  String get automationRunning => '运行中';
+
+  @override
+  String get automationPaused => '已暂停';
+
+  @override
+  String get automationAwaitingAi => '等待 AI';
+
+  @override
+  String get automationAwaitingAiHint => '任务正在请求 AI 判断，等待期间不会继续点击；可随时停止。';
+
+  @override
+  String get automationCompleted => '已完成';
+
+  @override
+  String get automationStopped => '已停止';
+
+  @override
+  String get automationInterrupted => '已中断，需核查现场';
+
+  @override
+  String get automationRequired => '此项必填';
+
+  @override
+  String get automationInvalidValue => '参数不符合类型、范围或允许值';
+
+  @override
+  String get automationRun => '确认运行';
+
+  @override
+  String get automationRunHint => '核对本次参数后启动；沿用已批准的应用、动作和完成条件。';
+
+  @override
+  String get automationElapsed => '主动耗时';
+
+  @override
+  String get automationCheckpoint => '当前检查点';
+
+  @override
+  String get automationRunOnce => '仅运行本次';
+
+  @override
+  String get automationRunOnceHint => '核对本次应用、完整流程和参数。只授权这一次运行，不保存任务，也不授予长期权限；成功后可再决定保存。';
+
+  @override
+  String get automationEvidence => '本机截图证据';
+
+  @override
+  String get automationEvidenceHint => '默认关闭；每次最多10张，总计50MB，保留7天，可查看和清理';
+
+  @override
+  String get automationEvidenceConfirm => '开启后保存任务关键步骤截图到本机，截图可能含私人内容，不会自动外发。每次最多10张，总计50MB，保留7天；关闭不删除已有截图，可另行清理。';
+
+  @override
+  String get automationClearEvidence => '清理截图证据';
+
+  @override
+  String get automationClearEvidenceHint => '删除本机保存的全部任务截图，不删除任务及文字结果。此操作无法撤回。';
+
+  @override
+  String get automationEvidenceUnavailable => '截图不存在或无法读取';
+
+  @override
   String get botsFolderGone => '这个文件夹已经不在了';
 
   @override
