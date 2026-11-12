@@ -1,0 +1,152 @@
+name: Android Release
+
+on:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: 3.47.7
+  DSH_MAVEN_MIRRORS: 0
+  TZ: Asia/Shanghai
+
+jobs:
+  release:
+    if: >-
+      github.repository == 'puppy-bai/dsh-Go' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       !contains(github.event.workflow_run.head_commit.message, '[skip-release]')))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Validate version and changelog
+        id: version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$(gh api repos/puppy-bai/dsh-Go/branches/main --jq .commit.sha)" || { echo 'Only the current main commit can be released'; exit 1; }
+          version="$(sed -n 's/^version:[[:space:]]*\([^+[:space:]]*\).*/\1/p' app/pubspec.yaml)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+          # An existing tag is immutable, including historical APKs uploaded separately.
+          tags="$(gh api --paginate repos/puppy-bai/dsh-Go/tags --jq '.[].name')"
+          if grep -Fxq "v$version" <<< "$tags"; then
+            echo "v$version already exists; nothing to release."
+            echo 'publish=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ '${{ github.event_name }}' == workflow_dispatch ]]; then
+            result="$(gh run list --repo puppy-bai/dsh-Go --workflow ci.yml --commit "$(git rev-parse HEAD)" --event push --limit 1 --json conclusion --jq '.[0].conclusion')"
+            test "$result" = success || { echo 'CI must pass for this commit before release'; exit 1; }
+          fi
+          python3 - "$version" docs/changelog.md "$RUNNER_TEMP/release-notes.md" <<'PY'
+          import pathlib, re, sys
+          version, source, output = sys.argv[1:]
+          text = pathlib.Path(source).read_text(encoding="utf-8")
+          match = re.search(rf"^## {re.escape(version)}(?:\s|$).*?(?=^## |\Z)", text, re.M | re.S)
+          if not match or "### 中文" not in match.group() or "### English" not in match.group():
+              raise SystemExit(f"docs/changelog.md needs bilingual sections for {version}")
+          pathlib.Path(output).write_text(match.group().strip() + "\n", encoding="utf-8")
+          PY
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo 'publish=true' >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        if: steps.version.outputs.publish == 'true'
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        if: steps.version.outputs.publish == 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Verify generated files
+        if: steps.version.outputs.publish == 'true'
+        run: |
+          python3 app/tool/l10n_merge.py --check
+          python3 app/tool/guide_sync.py --check
+      - name: Resolve Flutter dependencies
+        if: steps.version.outputs.publish == 'true'
+        working-directory: app
+        run: |
+          flutter pub get --enforce-lockfile
+      - name: Build pinned Android runtime
+        if: steps.version.outputs.publish == 'true'
+        run: runtime/build-runtime.sh arm64-v8a
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        if: steps.version.outputs.publish == 'true'
+        with:
+          gradle-version: '9.3.1'
+      - name: Prepare Gradle wrapper
+        if: steps.version.outputs.publish == 'true'
+        working-directory: app/android
+        run: |
+          printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > local.properties
+          gradle wrapper --gradle-version 9.3.1 --distribution-type all
+      - name: Restore Android signing key
+        if: steps.version.outputs.publish == 'true'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo 'ANDROID_KEYSTORE_BASE64 secret is required'; exit 1; }
+          mkdir -p "$RUNNER_TEMP/android-signing"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/android-signing/release.keystore"
+          chmod 600 "$RUNNER_TEMP/android-signing/release.keystore"
+          fingerprint="$(keytool -J-Duser.language=en -list -v -keystore "$RUNNER_TEMP/android-signing/release.keystore" -storepass android -alias androiddebugkey | sed -n 's/.*SHA256: //p' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          test "$fingerprint" = 48175d4029e9d47c4b008f15f706cb4deca1b88f80095b14d2b21a3d4ed02d35
+          cat > app/android/key.properties <<EOF
+          storeFile=$RUNNER_TEMP/android-signing/release.keystore
+          storePassword=android
+          keyAlias=androiddebugkey
+          keyPassword=android
+          EOF
+      - name: Build arm64 APK and release assets
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tooling/build-apk.sh --build-name '${{ steps.version.outputs.version }}' -- --dart-define=DSH_UPDATE_MIRROR=
+          (cd app/android && ./gradlew testArm64ReleaseUnitTest)
+          signer="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)"
+          "$signer" verify --print-certs app/build/app/outputs/flutter-apk/app-arm64-release.apk > "$RUNNER_TEMP/apk-signature.txt"
+          grep -Fq 'Signer #1 certificate SHA-256 digest: 48175d4029e9d47c4b008f15f706cb4deca1b88f80095b14d2b21a3d4ed02d35' "$RUNNER_TEMP/apk-signature.txt"
+          python3 tooling/release_assets.py --notes "$RUNNER_TEMP/release-notes.md" --delta-from 0
+      - name: Create GitHub Release
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v${{ steps.version.outputs.version }}"
+          flags=(--latest)
+          [[ '${{ steps.version.outputs.version }}' != *-* ]] || flags=(--prerelease --latest=false)
+          gh release create "$tag" dist/* --repo puppy-bai/dsh-Go --draft \
+            --target "$(git rev-parse HEAD)" \
+            --title "DSH Go ${{ steps.version.outputs.version }}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+          gh release download "$tag" --repo puppy-bai/dsh-Go --dir "$RUNNER_TEMP/release-verify"
+          cmp dist/SHA256SUMS "$RUNNER_TEMP/release-verify/SHA256SUMS"
+          cmp dist/update.json "$RUNNER_TEMP/release-verify/update.json"
+          (cd "$RUNNER_TEMP/release-verify" && sha256sum -c SHA256SUMS)
+          gh release edit "$tag" --repo puppy-bai/dsh-Go --draft=false "${flags[@]}"
+      - name: Remove signing material
+        if: always()
+        run: |
+          rm -f app/android/key.properties "$RUNNER_TEMP/android-signing/release.keystore"

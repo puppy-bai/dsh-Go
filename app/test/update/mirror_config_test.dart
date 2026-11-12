@@ -12,10 +12,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'support.dart';
 
-const _api = 'https://api.github.com/repos/ccch1mneyyy/dsh-go/releases/latest';
+const _api = 'https://api.github.com/repos/puppy-bai/dsh-Go/releases/latest';
 const _apk = 'dsh-go-0.9.0-arm64.apk';
-const _githubApk = 'https://github.com/ccch1mneyyy/dsh-go/releases/download/v0.9.0/$_apk';
-const _manifest = 'https://github.com/ccch1mneyyy/dsh-go/releases/latest/download/update.json';
+const _githubApk = 'https://github.com/puppy-bai/dsh-Go/releases/download/v0.9.0/$_apk';
+const _manifest = 'https://github.com/puppy-bai/dsh-Go/releases/latest/download/update.json';
 const _dlFeed = 'https://dl.dshtui.com/update.json';
 const _dlApk = 'https://dl.dshtui.com/download/0.9.0/$_apk';
 const _mirror = 'https://dl.example.com';
@@ -23,6 +23,12 @@ const _mirrorFeed = '$_mirror/update.json';
 const _mirrorApk = '$_mirror/download/0.9.0/$_apk';
 
 void main() {
+  test('community update URLs stay in the maintained fork', () {
+    expect(updateRepo, 'puppy-bai/dsh-Go');
+    expect(githubLatestApi.toString(), _api);
+    expect(githubReleasesPage.toString(), 'https://github.com/puppy-bai/dsh-Go/releases/latest');
+  });
+
   group('defaults', () {
     final sources = buildUpdateSources();
 

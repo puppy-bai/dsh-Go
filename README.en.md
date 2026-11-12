@@ -4,6 +4,8 @@
 
 > **Recommended version: 1.0.18.** It fixes an Android initialization failure in the automation parser that made global automatic mode display `i5` in 1.0.17. Download the arm64 APK from [GitHub Releases](../../releases/latest). Version 1.0.17 is marked as a prerelease and is not recommended for installation.
 
+Download community builds only from this repository's Releases; the original author's website below distributes upstream builds. The updater in 1.0.16–1.0.18 still points upstream: download and install updates manually without uninstalling. Future versions are built and published by [Android Release](.github/workflows/release.yml) after main's CI passes. Maintainers update `app/pubspec.yaml` and the bilingual changelog; see the [release process](docs/release.md#github-自动发版) for signing and workflow details.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-en-dark.webp">

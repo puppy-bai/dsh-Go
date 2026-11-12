@@ -4,6 +4,8 @@
 
 > **当前推荐版：1.0.18**。修复 1.0.17 在 Android 上初始化自动任务解析器失败、全局自动模式显示 `i5` 的问题。请从 [GitHub Releases](../../releases/latest) 下载 arm64 APK。1.0.17 已标为预发布版，不建议安装。
 
+社区版安装包只从本仓库 Releases 下载；下文原作者官网提供的是上游版本。1.0.16～1.0.18 的内置更新器仍指向上游，请手动下载覆盖升级，不要卸载。后续新版本在 main 的 CI 通过后由 [Android Release](.github/workflows/release.yml) 自动打包发布；维护者更新 `app/pubspec.yaml` 和双语更新日志即可，签名与流程见 [发版说明](docs/release.md#github-自动发版)。
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-zh-dark.webp">
