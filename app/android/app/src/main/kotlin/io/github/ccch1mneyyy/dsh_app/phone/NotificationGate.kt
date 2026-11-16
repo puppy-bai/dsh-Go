@@ -55,6 +55,8 @@ class NotificationGate(
         if (!available()) return Decision.UNAVAILABLE
         // Three buttons fit a heads-up: 本任务免确认 makes "allow" waive the rest of the task.
         val allow = when {
+            request.sendScope && request.firstInApp -> AppStrings.get(app, R.string.phone_prompt_allow_send_visual)
+            request.sendScope -> AppStrings.get(app, R.string.phone_prompt_allow_send)
             request.offerTaskWaiver -> AppStrings.get(app, R.string.overlay_allow_task_no_ask)
             request.firstInApp -> AppStrings.get(app, R.string.overlay_allow_task)
             else -> AppStrings.get(app, R.string.overlay_allow_once)
@@ -151,7 +153,7 @@ class NotificationGate(
             }
             choices.forEachIndexed { index, choice ->
                 val pi = if (choice == PromptChoice.OPEN) open else broadcast(choice.name, index)
-                b.addAction(Notification.Action.Builder(null, PhonePromptUi.label(app, choice), pi).build())
+                b.addAction(Notification.Action.Builder(null, PhonePromptUi.label(app, choice, content), pi).build())
             }
             if (!p.live) { close(); return null }
             nm.notify(TAG, id, b.build())

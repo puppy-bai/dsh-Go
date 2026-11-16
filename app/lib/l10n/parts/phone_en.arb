@@ -1,4 +1,6 @@
 {
+  "phoneVisualGrantsTitle": "Screenshot control permissions",
+  "phoneVisualGrantRevoke": "Tap to revoke screenshot-based tapping and input",
   "phoneDiagnosticsCollecting": "Collecting…",
   "phoneDiagnosticsPacking": "Packing…",
   "phoneDiagnosticsSharing": "Opening share sheet…",

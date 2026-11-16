@@ -27,6 +27,25 @@ class AutomationTest {
         try { block(); fail("Expected validation failure") } catch (_: IllegalArgumentException) {} catch (_: IllegalStateException) {}
     }
 
+    @Test fun dispatchFailureCanOnlyPauseTheExactPendingCheckpoint() {
+        val runner = AutomationRunner({ _, _ -> observe() })
+        runner.start(task(listOf(mapOf("op" to "ai", "prompt" to "first"), mapOf("op" to "ai", "prompt" to "second"))), emptyMap())
+        val first = await(runner, "awaiting_ai")
+        val id = first["runId"] as String
+        runner.answer(id, first["checkpoint"] as String, null, true, false)
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(4)
+        while (runner.status()["checkpoint"] == null && System.nanoTime() < deadline) Thread.sleep(5)
+        val second = await(runner, "awaiting_ai")
+        assertNotEquals(first["checkpoint"], second["checkpoint"])
+        invalid { runner.pauseCheckpoint(id, first["checkpoint"] as String, (first["dispatchEpoch"] as Number).toLong(), "checkpoint-dispatch-failed") }
+        assertEquals("awaiting_ai", runner.status()["state"])
+        assertEquals(second["checkpoint"], runner.status()["checkpoint"])
+        runner.pauseCheckpoint(id, second["checkpoint"] as String, (second["dispatchEpoch"] as Number).toLong(), "checkpoint-dispatch-failed")
+        assertEquals("paused", runner.status()["state"])
+        assertEquals("checkpoint-dispatch-failed", runner.status()["reason"])
+        runner.stop(id)
+    }
+
     @Test fun rejectsUnknownActionsUnboundedLoopsAndInvalidMetadataBeforeExecution() {
         for (s in listOf(
             mapOf("op" to "shell"), mapOf("op" to "repeat", "steps" to listOf(mapOf("op" to "snapshot"))),

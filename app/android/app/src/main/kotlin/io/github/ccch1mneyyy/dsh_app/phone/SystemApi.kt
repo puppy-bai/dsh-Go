@@ -272,9 +272,12 @@ sealed interface Either<out L, out R> {
 /** Lenient typed access to tool arguments (models send "7" for 7 and 7.0 for 7). */
 class Args(private val map: Map<String, Any?>) {
     fun has(key: String) = map[key] != null
+    fun keys(): Set<String> = map.keys
+    fun number(key: String): Number? = map[key] as? Number
 
     /** A JSON array argument (the `steps` of a gesture), as the parser produced it. */
     fun list(key: String): List<*>? = map[key] as? List<*>
+    fun obj(key: String): Map<*, *>? = map[key] as? Map<*, *>
 
     fun str(key: String): String? = when (val v = map[key]) {
         is String -> v.trim().takeIf { it.isNotEmpty() }

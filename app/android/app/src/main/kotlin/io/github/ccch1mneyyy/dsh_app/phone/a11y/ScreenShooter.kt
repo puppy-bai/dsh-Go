@@ -37,6 +37,7 @@ internal class Shot(
     val bytes: ByteArray?, val mime: String?, val geometry: ImageGeometry?, val secure: Boolean, val error: String?,
     /** When the system took the frame (device clock, ms), from [AccessibilityService.ScreenshotResult.getTimestamp]. */
     val takenAtMillis: Long? = null,
+    val frame: VisualFrame? = null,
 )
 
 internal class ScreenShooter(private val service: AccessibilityService, private val overlay: ControlOverlay) {
@@ -95,10 +96,11 @@ internal class ScreenShooter(private val service: AccessibilityService, private 
             try {
                 val sx = w.toFloat() / origin.width.coerceAtLeast(1)
                 val sy = h.toFloat() / origin.height.coerceAtLeast(1)
+                val frame = VisualFrame.fromBitmap(scaled)
                 draw(scaled, marks, secrets, origin, sx, sy)
                 val out = ByteArrayOutputStream()
                 scaled.compress(Bitmap.CompressFormat.JPEG, 80, out)
-                return Shot(out.toByteArray(), "image/jpeg", ImageGeometry(origin.left, origin.top, sx, sy, w, h), false, null, takenAt)
+                return Shot(out.toByteArray(), "image/jpeg", ImageGeometry(origin.left, origin.top, sx, sy, w, h), false, null, takenAt, frame)
             } finally { scaled.recycle() }
         } finally { bitmap.recycle() }
     }

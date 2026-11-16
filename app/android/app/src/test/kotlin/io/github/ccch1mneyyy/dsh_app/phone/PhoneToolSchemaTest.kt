@@ -61,7 +61,13 @@ class PhoneToolSchemaTest {
         assertEquals(17, PhoneToolCatalog.tools.size)
         val tap = PhoneToolCatalog.tools.single { it.name == PhoneToolCatalog.TAP_XY }
         assertEquals(listOf("observation", "x", "y"), tap.required)
-        assertEquals(setOf("observation", "x", "y"), tap.properties.keys)
+        assertEquals(setOf("observation", "x", "y", "send"), tap.properties.keys)
+        val send = tap.properties["send"] as Map<*, *>
+        assertEquals(listOf("app", "recipient", "text"), send["required"])
+        assertEquals(false, send["additionalProperties"])
+        for (tool in listOf(PhoneToolCatalog.TAP, PhoneToolCatalog.TYPE, PhoneToolCatalog.INPUT, PhoneToolCatalog.RUN)) {
+            assertEquals(send, PhoneToolCatalog.tools.single { it.name == tool }.properties["send"])
+        }
         for (key in listOf("x", "y")) {
             val field = tap.properties[key] as Map<*, *>
             assertEquals("integer", field["type"])

@@ -29,6 +29,7 @@ import io.github.ccch1mneyyy.dsh_app.phone.PhoneRegistry
  */
 class PhoneA11yService : AccessibilityService() {
     internal val clock = EventClock()
+    internal val foregroundIdentity = ForegroundWindowIdentity()
     private var overlay: ControlOverlay? = null
     private var driver: MainScreenDriver? = null
     private var probe: A11yProbe? = null
@@ -80,6 +81,8 @@ class PhoneA11yService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         clock.tick(event?.packageName)
+        if (event != null && event.eventType in setOf(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED, AccessibilityEvent.TYPE_VIEW_FOCUSED, AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED))
+            foregroundIdentity.record(event.windowId, event.packageName?.toString(), android.os.SystemClock.uptimeMillis())
         // Content/scroll changes are also caused by our own actions. Only the explicit
         // interaction signal can identify a touch, and even it is not delivered by every ROM.
         if (event?.eventType == AccessibilityEvent.TYPE_TOUCH_INTERACTION_START && !InjectGuard.active()) {

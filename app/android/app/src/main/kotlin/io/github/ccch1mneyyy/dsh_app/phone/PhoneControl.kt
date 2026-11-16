@@ -77,6 +77,8 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
             "phone_key_recents" -> R.string.phone_key_recents
             "phone_key_notifications" -> R.string.phone_key_notifications
             "phone_confirm_first_app" -> R.string.phone_confirm_first_app
+            "phone_confirm_visual_app" -> R.string.phone_confirm_visual_app
+            "phone_confirm_send_scope" -> R.string.phone_confirm_send_scope
             "phone_confirm_element" -> R.string.phone_confirm_element
             "phone_confirm_tap" -> R.string.phone_confirm_tap
             "phone_confirm_long_tap" -> R.string.phone_confirm_long_tap
@@ -215,10 +217,21 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
         p
     }
 
-    fun setPolicies(map: Map<*, *>?): Boolean {
+    @Synchronized fun setPolicies(map: Map<*, *>?): Boolean {
         // Partial updates keep what they don't mention (the 免确认 switch sends only its flag).
         val p = PhonePolicies.fromMap(map, base = policies())
         prefs.edit().putString(K_POLICIES, Json.write(p.toMap())).apply()
+        policiesCache = p
+        return true
+    }
+
+    @Synchronized override fun grantVisual(packageName: String): Boolean {
+        if (isLocked() || packageName in policies().denyPackages ||
+            PhoneRegistry.mainDriver?.foregroundPackage() != packageName) return false
+        val p = PhonePolicies.fromMap(mapOf(
+            "visualPackages" to (policies().visualPackages + packageName).distinct(),
+        ), base = policies())
+        if (!prefs.edit().putString(K_POLICIES, Json.write(p.toMap())).commit()) return false
         policiesCache = p
         return true
     }
@@ -227,7 +240,7 @@ class PhoneControl private constructor(private val app: Context) : PhoneEnv, Con
     fun policiesMap(): Map<String, Any?> {
         val p = policies()
         val labels = LinkedHashMap<String, String>()
-        for (pkg in (p.denyPackages + p.confirmEveryWritePackages + PhonePolicies().denyPackages + PhonePolicies().confirmEveryWritePackages).distinct()) {
+        for (pkg in (p.denyPackages + p.confirmEveryWritePackages + p.visualPackages + PhonePolicies().denyPackages + PhonePolicies().confirmEveryWritePackages).distinct()) {
             label(pkg)?.let { labels[pkg] = it }
         }
         return p.toMap() + mapOf("labels" to labels, "defaults" to PhonePolicies().toMap())

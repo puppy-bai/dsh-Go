@@ -197,7 +197,9 @@
     <string name="phone_confirm_submit">，然后发送 / 提交</string>
     <string name="phone_confirm_tap_xy">在「%1$s」点截图上的位置 (%2$s, %3$s)</string>
     <string name="phone_confirm_gesture">在「%1$s」做手势：%2$s</string>
-    <string name="phone_confirm_input">在「%1$s」按截图上的位置 (%2$s, %3$s) 输入文字</string>
+    <string name="phone_confirm_input">在「%1$s」按截图上的位置 (%2$s, %3$s) 输入："%4$s"</string>
+    <string name="phone_confirm_visual_app">允许 DSH 在「%1$s」使用截图定位执行这一步：%2$s？选择本应用本任务会记住视觉权限；仅此一步不会保存。操作仍遵守手机操控授权，可在应用名单撤销。</string>
+    <string name="phone_confirm_send_scope">授权本次发送：\n应用：%1$s\n联系人：%2$s\n完整消息：\n%3$s\n\n确认后，同一手机任务内搜索、输入、粘贴和发送共用这次授权。更换应用、联系人或正文需重新确认。请核对当前聊天对象和草稿。</string>
     <string name="phone_confirm_scroll">在「%1$s」滚动</string>
     <string name="phone_confirm_key">按系统键</string>
     <string name="phone_current_app">当前应用</string>

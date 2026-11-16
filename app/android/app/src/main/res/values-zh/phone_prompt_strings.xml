@@ -5,6 +5,8 @@
     <string name="phone_prompt_native_title">DSH Go · 手机操控确认</string>
     <string name="phone_prompt_handoff_title">DSH Go · 请你操作</string>
     <string name="phone_prompt_allow_once">允许一次</string>
+    <string name="phone_prompt_allow_send">允许本次发送</string>
+    <string name="phone_prompt_allow_send_visual">允许本次发送并记住视觉权限</string>
     <string name="phone_prompt_allow_app">本任务允许操作此应用</string>
     <string name="phone_prompt_allow_task">本任务免确认</string>
     <string name="phone_prompt_reject">拒绝</string>

@@ -16,6 +16,7 @@ class AutomationHostTest {
         val tasks = PhoneTasks()
         val reads = AtomicInteger()
         val writes = CopyOnWriteArrayList<PhoneAction>()
+        var policies = PhonePolicies()
         @Volatile var pkg = "example.app"
         @Volatile var latest = ScreenSnapshot("s0", "Ready\nContinue", "Example", pkg)
         var onObserve: (Int) -> Unit = {}
@@ -48,7 +49,7 @@ class AutomationHostTest {
         }
         val env = object : PhoneEnv {
             override fun enabled() = true
-            override fun policies() = PhonePolicies()
+            override fun policies() = policies
             override fun isLocked() = false
             override fun driver(screen: PhoneScreen) = if (screen == PhoneScreen.MAIN) driver else null
             override fun gate() = object : UserGate {
@@ -87,6 +88,7 @@ class AutomationHostTest {
 
     @Test fun aiScreenshotCoordinatesDoNotAcquireAnInterveningObservation() {
         Fixture().use { f ->
+            f.policies = PhonePolicies(visualPackages = listOf("example.app"))
             f.start(listOf(mapOf("op" to "ai", "prompt" to "Locate the visible button")))
             val checkpoint = f.await("awaiting_ai")
             val image = f.host.read(mapOf("image" to true))
@@ -102,7 +104,7 @@ class AutomationHostTest {
         }
     }
 
-    @Test fun changingAppsDuringCheckpointReadDiscardsTextAndImageAndPauses() {
+    @Test fun changingAppsDuringCheckpointReadDiscardsContentWithoutPausingTheRun() {
         Fixture().use { f ->
             f.start(listOf(mapOf("op" to "ai", "prompt" to "Inspect")))
             f.await("awaiting_ai")
@@ -111,8 +113,8 @@ class AutomationHostTest {
             assertTrue(result.isError)
             assertNull(result.image)
             assertFalse(result.text.contains("Continue"))
-            f.await("paused")
-            assertTrue(f.tasks.isPaused)
+            assertEquals("awaiting_ai", f.status()["state"])
+            assertFalse(f.tasks.isPaused)
             assertTrue(f.writes.isEmpty())
         }
     }

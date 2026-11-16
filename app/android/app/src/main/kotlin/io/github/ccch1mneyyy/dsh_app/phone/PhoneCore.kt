@@ -10,6 +10,7 @@ interface PhoneEnv {
     /** The master switch. */
     fun enabled(): Boolean
     fun policies(): PhonePolicies
+    fun grantVisual(packageName: String): Boolean = false
     fun isLocked(): Boolean
     fun gate(): UserGate?
     fun driver(screen: PhoneScreen): PhoneDriver?
@@ -46,7 +47,7 @@ class PhoneCore(
     private val automatedAdmission = ThreadLocal<() -> Boolean>()
     val safety = SafetyGate(
         { env.policies().let { if (automatedCall.get() == true) it.copy(confirmMode = ConfirmMode.ALWAYS) else it } },
-        tasks, env::gate, uiText = env.uiText(),
+        tasks, env::gate, uiText = env.uiText(), onVisualApproved = env::grantVisual,
     )
 
     internal data class AutomationObservation(
@@ -93,6 +94,7 @@ class PhoneCore(
         val app: String? = null,
         val summary: String? = null,
         val decision: String? = null,
+        val mayHaveActed: Boolean? = null,
     )
 
     fun call(name: String, args: Map<String, Any?>): ToolOutput {
@@ -194,6 +196,14 @@ class PhoneCore(
             }
         }
         if (!current(owner)) return stoppedOut(name)
+        val send = if (name != PhoneToolCatalog.RUN && "send" in a.keys()) {
+            if (name !in setOf(PhoneToolCatalog.TAP, PhoneToolCatalog.TYPE, PhoneToolCatalog.INPUT, PhoneToolCatalog.TAP_XY)) {
+                return Out("send-scope-unsupported-tool", error = true, decision = "invalid-send-scope")
+            }
+            try { SendScope.parse(a) } catch (e: IllegalArgumentException) {
+                return Out(e.message ?: "invalid-send-scope", error = true, decision = "invalid-send-scope")
+            }
+        } else null
         return when (name) {
             PhoneToolCatalog.APPS -> apps(a, owner)
             PhoneToolCatalog.OPEN -> open(a, scope, owner)
@@ -203,9 +213,9 @@ class PhoneCore(
             PhoneToolCatalog.SCREEN -> screen(a, owner)
             PhoneToolCatalog.COLLECT -> collect(a, owner)
             PhoneToolCatalog.RUN -> routine(a, scope, owner)
-            PhoneToolCatalog.TAP -> if (a.int("id") == null) tapByText(a, scope, owner) else act(name, a, scope, owner)
+            PhoneToolCatalog.TAP -> if (a.int("id") == null) tapByText(a, scope, owner, send = send) else act(name, a, scope, owner, send = send)
             PhoneToolCatalog.SCROLL -> if (a.str("until") != null) scrollUntil(a, scope, owner) else act(name, a, scope, owner)
-            PhoneToolCatalog.TYPE, PhoneToolCatalog.TAP_XY, PhoneToolCatalog.GESTURE, PhoneToolCatalog.INPUT -> act(name, a, scope, owner)
+            PhoneToolCatalog.TYPE, PhoneToolCatalog.TAP_XY, PhoneToolCatalog.GESTURE, PhoneToolCatalog.INPUT -> act(name, a, scope, owner, send = send)
             PhoneToolCatalog.KEY -> key(a, owner)
             PhoneToolCatalog.HANDOFF -> handoff(a, scope, owner)
             // l10n:keep agent tool result
@@ -562,7 +572,7 @@ class PhoneCore(
      * `tap` runs on its id — so the fingerprint re-check, the safety gate and the confirmation
      * are exactly the same. A tie is refused with the candidates, never guessed.
      */
-    private fun tapByText(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner, batchApproved: Boolean = false, expectedPackage: String? = null): Out {
+    private fun tapByText(a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner, batchApproved: Boolean = false, expectedPackage: String? = null, send: SendScope? = null): Out {
         if (!current(owner)) return stoppedOut(PhoneToolCatalog.TAP)
         val sid = a.str("screen")
         val which = when (val r = routeScreenId(sid, "screen")) {
@@ -581,7 +591,7 @@ class PhoneCore(
             decision = lookup.reasonCode ?: "target-missing") // l10n:keep agent tool result
         val args = linkedMapOf<String, Any?>("screen" to sid, "id" to found)
         if (a.bool("long") == true) args["long"] = true
-        return act(PhoneToolCatalog.TAP, Args(args), scope, owner, batchApproved, expectedPackage)
+        return act(PhoneToolCatalog.TAP, Args(args), scope, owner, batchApproved, expectedPackage, send)
     }
 
     /**
@@ -662,7 +672,7 @@ class PhoneCore(
     }
 
     /** tap / type / scroll / tap_xy / gesture: route, resolve, gate, perform. */
-    private fun act(name: String, a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner, batchApproved: Boolean = false, expectedPackage: String? = null): Out {
+    private fun act(name: String, a: Args, scope: SerialWorker.Scope, owner: PhoneTasks.Owner, batchApproved: Boolean = false, expectedPackage: String? = null, send: SendScope? = null): Out {
         if (!current(owner)) return stoppedOut(name)
         val coordinate = name == PhoneToolCatalog.TAP_XY || name == PhoneToolCatalog.GESTURE || name == PhoneToolCatalog.INPUT
         val screenParameter = if (coordinate) "observation" else "screen"
@@ -728,6 +738,7 @@ class PhoneCore(
                 if (filled.length > 2000) return Out("input 的 text 太长（最多 2000 字）。", error = true)
                 submit = a.bool("submit") == true
                 point = x to y
+                typed = filled
                 action = PhoneAction.Input(sid, x, y, filled, submit)
                 kind = WriteKind.INPUT
                 // Only the length: the target is unknown until the field is focused, so it could be a password.
@@ -777,7 +788,7 @@ class PhoneCore(
         val pkg = target?.packageName ?: driver.foregroundPackage()
         val appLabel = target?.appLabel
         val app = appLabel ?: pkg
-        val verdict = safety.checkWrite(kind, target, pkg, appLabel, typed, submit, point, note, batchApproved)
+        val verdict = safety.checkWrite(kind, target, pkg, appLabel, typed, submit, point, note, batchApproved, send)
         val decision = when (val r = safety.resolve(verdict, scope)) {
             is SafetyGate.Result.No -> return Out(r.message, error = true, app = app, summary = summary, decision = r.decision)
             is SafetyGate.Result.Go -> r.decision
@@ -786,7 +797,7 @@ class PhoneCore(
         if (!tasks.setAppIfCurrent(owner, appLabel ?: pkg)) return stoppedOut(summary)
         say(ui.get("phone_acting", "DSH 正在操作 · %1\$s", statusLine(kind, target, if (secret) SafetyRules.MASK else typed))) // l10n:keep test default
         if (!current(owner)) return stoppedOut(summary)
-        if (expectedPackage != null && driver.foregroundPackage() != expectedPackage) return Out("前台应用已改变，没有执行。", error = true, decision = "app-changed")
+        if (expectedPackage != null && driver.foregroundPackage() != expectedPackage) return Out("前台应用已改变，没有执行。", error = true, decision = "app-changed", mayHaveActed = false)
         if (automatedAdmission.get()?.invoke() == false) return stoppedOut(name)
         val res = driver.perform(action)
         if (!res.ok && res.staleSnapshot) return stale(driver, sid, summary, owner, res.message)
@@ -796,7 +807,7 @@ class PhoneCore(
             screen = res.screen?.let { safety.filterScreen(it) },
             app = app,
             summary = summary,
-            decision = if (res.ok) decision else res.reasonCode ?: "failed",
+            decision = res.reasonCode ?: if (res.ok) decision else "failed",
         )
     }
 
@@ -806,6 +817,7 @@ class PhoneCore(
             is Either.Left -> return Out(parsed.value, error = true, summary = "run", decision = "invalid-plan")
             is Either.Right -> parsed.value
         }
+        if (plan.schema == 2) return chatRoutine(plan, scope, owner)
         if (plan.dryRun) return Out(Json.write(linkedMapOf(
             "dryRun" to true, "app" to plan.app, "startAt" to plan.startAt,
             "steps" to plan.steps.mapIndexed { i, s -> mapOf("step" to i + 1, "action" to s.summary()) },
@@ -951,6 +963,204 @@ class PhoneCore(
             trace += mapOf("step" to activeStep, "ok" to false, "decision" to "device-error", "mayHaveActed" to dispatched)
             return result(false, activeStep, "device-error", dispatched)
         }
+    }
+
+    /** Short chat calls use the same actions and gate as single-step tools; no saved task is started. */
+    private fun chatRoutine(plan: RoutinePlan, scope: SerialWorker.Scope, owner: PhoneTasks.Owner): Out {
+        if (plan.dryRun) return Out(Json.write(mapOf(
+            "schema" to 2, "dryRun" to true, "apps" to plan.apps.toList(),
+            "steps" to plan.steps.map { it.op }, "status" to "validated",
+        )), summary = "run dryRun", decision = "ok")
+        val driver = env.driver(PhoneScreen.MAIN)
+            ?: return Out("observation-unavailable", error = true, decision = "unavailable")
+        class Halt(val status: String, val reason: String, val acted: Boolean = false) : RuntimeException()
+        val variables = linkedMapOf<String, Any?>()
+        val trace = arrayListOf<Map<String, Any?>>()
+        var latest: ScreenSnapshot? = null
+        var completed = 0
+        var executed = 0
+        var activePath = "1"
+        var dispatched = false
+        var segmentActed = false
+        val started = SerialWorker.now()
+        fun ready() {
+            if (!current(owner) || tasks.isPaused) throw Halt("interrupted", "user-interrupted", dispatched)
+            if (env.isLocked()) throw Halt("interrupted", "device-locked", dispatched)
+            if (scope.charged(started, SerialWorker.now()) >= RoutinePlan.BUDGET_MS - 30_000) throw Halt("need-ai", "budget", dispatched)
+        }
+        fun accept(out: Out): Out {
+            val snap = out.screen
+            if (snap != null && snap.packageName !in plan.apps) {
+                latest = null
+                throw Halt("interrupted", "app-changed", dispatched)
+            }
+            latest = snap ?: latest
+            if (dispatched && !out.error) segmentActed = true
+            if (out.decision == "need-visual-paste") throw Halt("need-ai", "need-visual-paste", true)
+            if (out.error) {
+                val reason = out.decision ?: "device-error"
+                val noAction = reason in setOf("target-missing", "target-ambiguous", "target-disabled", "target-not-visible", "observation-stale", "stale", "invalid-selector", "unavailable", "denied", "stopped", "device-locked") || reason.startsWith("refused:")
+                val acted = out.mayHaveActed ?: (dispatched && !noAction)
+                val status = when {
+                    acted -> "result-uncertain"
+                    reason.startsWith("refused:") || reason in setOf("denied", "stopped", "device-locked") -> "blocked"
+                    else -> "need-ai"
+                }
+                throw Halt(status, reason, acted)
+            }
+            return out
+        }
+        fun observe(image: Boolean = false): ScreenSnapshot {
+            ready()
+            if (driver.foregroundPackage() !in plan.apps) { latest = null; throw Halt("interrupted", "app-changed", dispatched) }
+            val snap = accept(screen(Args(mapOf("image" to image)), owner)).screen
+                ?: throw Halt("need-ai", "observation-unavailable", dispatched)
+            return snap
+        }
+        fun readable(snap: ScreenSnapshot) {
+            if (snap.observationReason != null) throw Halt("need-ai", snap.observationReason, dispatched)
+        }
+        fun checkText(text: String, mode: String = "contains", timeout: Int = 0): Boolean {
+            val deadline = SerialWorker.now() + timeout
+            do {
+                val snap = observe()
+                readable(snap)
+                if (driver.hasVisibleText(snap, text, mode)) return true
+                if (SerialWorker.now() >= deadline) return false
+                env.sleep(250)
+            } while (true)
+        }
+        fun condition(raw: Any?): Boolean {
+            val c = AutomationPlan.obj(AutomationPlan.substitute(raw, variables))
+            val matched = if (c["variable"] is String) {
+                val name = c["variable"] as String
+                if (!variables.containsKey(name)) throw Halt("need-ai", "unknown-variable")
+                AutomationPlan.sameValue(variables[name], c["equals"])
+            } else checkText(c["text"] as String, c["match"] as? String ?: "contains")
+            return if (c["not"] == true) !matched else matched
+        }
+        fun forbidden(text: String?) = text != null && plan.forbiddenTargets.any { text.contains(it, true) }
+        fun target(args: Map<String, Any?>, snap: ScreenSnapshot): Int {
+            readable(snap)
+            val selector = args["selector"]?.let(AutomationPlan::obj)
+            val found = if (selector != null) driver.select(snap.id, selector) else driver.lookup(snap.id, args["target"] as String)
+            val id = found.elementId ?: throw Halt("need-ai", found.reasonCode ?: "target-missing")
+            val info = driver.target(snap.id, id) ?: throw Halt("need-ai", "observation-stale")
+            if (forbidden(info.label) || forbidden(info.viewId)) throw Halt("blocked", "task-boundary")
+            return id
+        }
+        lateinit var block: (List<Map<String, Any?>>, String, Boolean) -> Boolean
+        block = { items, prefix, inLoop ->
+            var keepGoing = true
+            for ((index, source) in items.withIndex()) {
+                if (!keepGoing) break
+                activePath = prefix + (index + 1)
+                dispatched = false
+                ready()
+                if (++executed > 500) throw Halt("need-ai", "step-budget")
+                val s = source.mapValues { (key, value) ->
+                    if (key in setOf("steps", "then", "else")) value else AutomationPlan.substitute(value, variables)
+                }
+                val op = (s["_chatOp"] as? String) ?: (s["op"] as String)
+                val path = activePath
+                if (op != "open" && driver.foregroundPackage() !in plan.apps) { latest = null; throw Halt("interrupted", "app-changed") }
+                s["requireText"]?.let { if (!checkText(it as String)) throw Halt("need-ai", "precondition") }
+                when (op) {
+                    "yield" -> throw Halt("need-ai", "requested")
+                    "set" -> variables[s["name"] as String] = s["value"]
+                    "if" -> {
+                        val branch = if (condition(s["condition"])) s["then"] else s["else"]
+                        if (branch != null) keepGoing = block(AutomationPlan.list(branch), path + ".", inLoop)
+                    }
+                    "repeat" -> {
+                        for (iteration in 1..(s["count"] as Number).toInt()) {
+                            if (s["until"] != null && condition(s["until"])) break
+                            if (!block(AutomationPlan.list(s["steps"]), path + "." + iteration + ".", true)) break
+                        }
+                    }
+                    "break" -> { if (!inLoop) throw Halt("blocked", "break-outside-loop"); keepGoing = false }
+                    "wait" -> {
+                        if (s["ms"] != null) {
+                            val deadline = SerialWorker.now() + (s["ms"] as Number).toLong()
+                            while (SerialWorker.now() < deadline) { ready(); env.sleep(minOf(100, deadline - SerialWorker.now()).coerceAtLeast(1)) }
+                        } else if (!checkText(s["text"] as String, s["match"] as? String ?: "contains", (s["timeoutMs"] as? Number)?.toInt() ?: 5000)) throw Halt("need-ai", "target-timeout")
+                    }
+                    "assert" -> if (!checkText(s["text"] as String, s["match"] as? String ?: "contains")) throw Halt("need-ai", "assertion")
+                    "observe", "snapshot" -> observe(image = op == "snapshot")
+                    "open" -> {
+                        val app = s["app"] as String
+                        if (app !in plan.apps) throw Halt("blocked", "app-out-of-scope")
+                        dispatched = true
+                        val opened = open(Args(mapOf("app" to app)), scope, owner)
+                        if (opened.error) accept(Out(opened.text, error = true, decision = opened.decision))
+                        val deadline = SerialWorker.now() + 5000
+                        while (driver.foregroundPackage() != app && SerialWorker.now() < deadline) { ready(); env.sleep(100) }
+                        if (driver.foregroundPackage() != app) throw Halt("result-uncertain", "launch-not-visible", true)
+                        observe()
+                    }
+                    "tap_xy", "input", "gesture" -> {
+                        if (plan.forbiddenTargets.isNotEmpty()) throw Halt("blocked", "coordinate-boundary-unverifiable")
+                        val pkg = driver.foregroundPackage() ?: throw Halt("need-ai", "foreground-unknown")
+                        if (pkg !in plan.apps) throw Halt("interrupted", "app-changed")
+                        dispatched = true
+                        val tool = when (op) { "input" -> PhoneToolCatalog.INPUT; "gesture" -> PhoneToolCatalog.GESTURE; else -> PhoneToolCatalog.TAP_XY }
+                        accept(act(tool, Args(s - setOf("op", "_chatOp")), scope, owner, expectedPackage = pkg, send = plan.send))
+                        completed++
+                        trace += mapOf("path" to path, "op" to op, "decision" to "yield-after-visual-action")
+                        activePath = path + ".after"
+                        throw Halt("need-ai", "visual-action-completed", true)
+                    }
+                    else -> {
+                        val snap = observe()
+                        if (op != "key") readable(snap)
+                        val pkg = snap.packageName!!
+                        val wire = s - "op" + ("screen" to snap.id)
+                        when (op) {
+                            "tap", "type", "find", "read_text" -> {
+                                val id = target(s, snap)
+                                if (op == "find" || op == "read_text") {
+                                    variables[s["name"] as? String ?: "found"] = driver.target(snap.id, id)?.label ?: throw Halt("need-ai", "observation-stale")
+                                } else {
+                                    dispatched = true
+                                    accept(act(if (op == "tap") PhoneToolCatalog.TAP else PhoneToolCatalog.TYPE, Args(wire + ("id" to id)), scope, owner, expectedPackage = pkg, send = plan.send))
+                                }
+                            }
+                            "scroll" -> {
+                                dispatched = true
+                                accept(if (s["until"] != null) scrollUntil(Args(wire), scope, owner, pkg) else act(PhoneToolCatalog.SCROLL, Args(wire), scope, owner, expectedPackage = pkg))
+                            }
+                            "key" -> { dispatched = true; accept(key(Args(wire), owner, pkg)) }
+                        }
+                    }
+                }
+                s["expect"]?.let { if (!checkText(it as String, timeout = 5000)) throw Halt(if (dispatched) "result-uncertain" else "need-ai", "expectation", dispatched) }
+                completed++
+                trace += mapOf("path" to path, "op" to op, "decision" to "ok")
+                log.add(PhoneToolCatalog.RUN, driver.foregroundPackage(), op, "ok")
+            }
+            keepGoing
+        }
+        var status = "completed"
+        var reason = "done"
+        var mayHaveActed = false
+        try { block(plan.steps.map { it.args }, "", false) }
+        catch (h: Halt) { status = h.status; reason = h.reason; mayHaveActed = h.acted }
+        catch (_: InterruptedException) { Thread.currentThread().interrupt(); status = "interrupted"; reason = "stopped"; mayHaveActed = dispatched }
+        catch (_: Exception) { status = if (dispatched) "result-uncertain" else "blocked"; reason = "invalid-runtime"; mayHaveActed = dispatched }
+        if (status == "need-ai" && current(owner) && !tasks.isPaused && !env.isLocked() && driver.foregroundPackage() in plan.apps) {
+            // Capture only after relinquishing the script; it will be the AI's next valid observation.
+            val out = screen(Args(mapOf("image" to true)), owner)
+            latest = out.screen?.takeIf { !out.error && it.packageName in plan.apps }
+        }
+        val ok = status == "completed" || status == "need-ai"
+        return Out(Json.write(linkedMapOf(
+            "schema" to 2, "ok" to ok, "status" to status, "reason" to reason, "completed" to completed,
+            "nextStep" to if (status == "completed") null else activePath, "mayHaveActed" to (mayHaveActed || segmentActed),
+            "resume" to if (status == "completed") null else "基于返回的新观察决定后续步骤；不要重放已完成的步骤或不确定的发送。",
+            "elapsedMs" to SerialWorker.now() - started, "executedNodes" to executed, "trace" to trace,
+            "values" to variables, "packageName" to latest?.packageName, "observation" to latest?.id,
+        )), error = !ok, screen = latest?.takeIf { current(owner) && !env.isLocked() && it.packageName in plan.apps }?.let(safety::filterScreen),
+            app = plan.app, summary = "run $completed", decision = reason)
     }
 
     /** A `type` in the log without its length or text: 「输入 s3#5（••••）」. */

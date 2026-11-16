@@ -86,12 +86,6 @@ internal class AutomationHost(
 
     private fun status(): Map<*, *> = service.request("status", emptyMap())["run"] as? Map<*, *> ?: emptyMap<String, Any?>()
 
-    @Synchronized private fun pauseCheckpoint(expected: Map<*, *>) {
-        val run = status()
-        if (run["runId"] == expected["runId"] && run["checkpoint"] == expected["checkpoint"] &&
-            run["dispatchEpoch"] == expected["dispatchEpoch"] && run["state"] == "awaiting_ai") control("pause")
-    }
-
     /** AI reads are bound to the pending checkpoint and the same approved main-screen apps. */
     fun read(args: Map<String, Any?>): ToolOutput {
         val run = status()
@@ -107,12 +101,10 @@ internal class AutomationHost(
                 driver.foregroundPackage() in allowed && !env.isLocked()
         }
         if (!admitted()) {
-            pauseCheckpoint(run)
             return ToolOutput("app-out-of-scope-or-interrupted", isError = true)
         }
         val observed = core.automationCall(PhoneToolCatalog.SCREEN, args, ::admitted)
         if (!admitted() || observed.screen?.packageName !in allowed) {
-            pauseCheckpoint(run)
             return ToolOutput("app-out-of-scope-or-interrupted", isError = true)
         }
         if (!observed.output.isError) evidence.capture(run["runId"] as String, "ai", observed.screen)

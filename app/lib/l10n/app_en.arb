@@ -2884,6 +2884,8 @@
   "petActionVoiceReturn": "Back to pet",
   "petActionVoiceStop": "Finish recording",
   "petActionVoiceStart": "Record",
+  "phoneVisualGrantsTitle": "Screenshot control permissions",
+  "phoneVisualGrantRevoke": "Tap to revoke screenshot-based tapping and input",
   "phoneDiagnosticsCollecting": "Collecting…",
   "phoneDiagnosticsPacking": "Packing…",
   "phoneDiagnosticsSharing": "Opening share sheet…",

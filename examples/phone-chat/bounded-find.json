@@ -1,0 +1,14 @@
+{
+  "schema": 2,
+  "apps": ["example.phone.lab"],
+  "steps": [
+    {
+      "op": "repeat",
+      "count": 5,
+      "until": {"text": "目标条目", "match": "contains"},
+      "steps": [{"op": "scroll", "direction": "down"}]
+    },
+    {"op": "find", "target": "目标条目", "name": "found"},
+    {"op": "yield"}
+  ]
+}

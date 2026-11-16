@@ -120,6 +120,16 @@ internal object TreeCapture {
                 // sub-page); the active window's root is still reachable through the service.
                 val root = w.root ?: (if (w.isActive || w.isFocused) activeRoot(service, w.id) else null)
                 if (root == null) {
+                    if (chosen.isEmpty()) {
+                        val pkg = (service as? PhoneA11yService)?.foregroundIdentity?.packageFor(w.id, w.isActive || w.isFocused, SystemClock.uptimeMillis())
+                        topPackage = pkg
+                        ownFront = pkg == ownPackage
+                        systemFront = w.type == AccessibilityWindowInfo.TYPE_SYSTEM
+                        val title = if (Build.VERSION.SDK_INT >= 24) w.title?.toString() else null
+                        chosen += UiWindow(w.id, if (systemFront) WindowKind.SYSTEM else WindowKind.APP, pkg, title, bounds, null)
+                        hidden = title ?: ""
+                        break
+                    }
                     // A dialog, split-screen pane or IME-resized app can be unreadable too.
                     if (w.type == AccessibilityWindowInfo.TYPE_APPLICATION) {
                         when (WindowContent.rootGap(chosen)) {
@@ -179,7 +189,8 @@ internal object TreeCapture {
                 w.getBoundsInScreen(rect)
                 val share = Box(rect.left, rect.top, rect.right, rect.bottom).intersect(screen).area.toDouble() / screen.area.coerceAtLeast(1)
                 if (w.type == AccessibilityWindowInfo.TYPE_SYSTEM && share < 0.5) continue
-                val root = w.root ?: (if (w.isActive || w.isFocused) activeRoot(service, w.id) else null) ?: continue
+                val root = w.root ?: (if (w.isActive || w.isFocused) activeRoot(service, w.id) else null)
+                    ?: return (service as? PhoneA11yService)?.foregroundIdentity?.packageFor(w.id, w.isActive || w.isFocused, SystemClock.uptimeMillis())
                 try { return root.packageName?.toString() } finally { release(root) }
             }
         } finally {

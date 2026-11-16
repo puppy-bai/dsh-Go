@@ -202,7 +202,9 @@
     <string name="phone_confirm_submit">, then send / submit</string>
     <string name="phone_confirm_tap_xy">Tap (%2$s, %3$s) on the screenshot in “%1$s”</string>
     <string name="phone_confirm_gesture">Do a gesture in “%1$s”: %2$s</string>
-    <string name="phone_confirm_input">Type into the point (%2$s, %3$s) in “%1$s”</string>
+    <string name="phone_confirm_input">Type “%4$s” into the point (%2$s, %3$s) in “%1$s”</string>
+    <string name="phone_confirm_visual_app">Allow DSH to use screenshot targeting for this action in “%1$s”: %2$s? Choosing this app remembers visual permission until revoked; allowing once does not save it. Phone-control authorization still applies. Revoke it in the app list.</string>
+    <string name="phone_confirm_send_scope">Authorize this send:\nApp: %1$s\nRecipient: %2$s\nFull message:\n%3$s\n\nOnce confirmed, searching, typing, pasting and sending share this authorization within the current phone task. A different app, recipient or message requires confirmation again. Verify the current chat recipient and draft.</string>
     <string name="phone_confirm_scroll">Scroll in “%1$s”</string>
     <string name="phone_confirm_key">Press a system key</string>
     <string name="phone_current_app">current app</string>

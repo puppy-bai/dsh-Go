@@ -56,6 +56,15 @@ class PhonePromptTest {
         assertEquals(PromptOutcome.ALLOW_TASK, t.await().outcome)
     }
 
+    @Test fun sendScopeDoesNotOfferAnUnrequestedTaskOrAppWaiver() {
+        val request = ConfirmRequest("recipient and full message", "Example", "example.app", false, sendScope = true)
+        val content = PromptContent(PromptKind.NATIVE_CONFIRM, request.sentence, request)
+        assertEquals(listOf(PromptChoice.ALLOW_ONCE, PromptChoice.REJECT, PromptChoice.STOP), content.choices)
+        val firstVisual = content.copy(native = request.copy(firstInApp = true))
+        assertTrue(firstVisual.choices.contains(PromptChoice.ALLOW_APP))
+        assertFalse(firstVisual.choices.contains(PromptChoice.ALLOW_TASK))
+    }
+
     @Test fun sharedSlotNeverOverwritesANativeQuestion() {
         val native = arbiter.begin(null, Any(), content(PromptKind.NATIVE_CONFIRM), 30_000) { true }!!
         assertNull(arbiter.begin("engine", source, content(), 30_000) { true })

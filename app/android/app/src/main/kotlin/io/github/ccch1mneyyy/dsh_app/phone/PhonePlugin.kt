@@ -192,6 +192,10 @@ class PhonePlugin : FlutterPlugin, ActivityAware, MethodChannel.MethodCallHandle
                 async(result) { control.background.adbConnect(call.argument<Int>("port"), live) }
             }
             "getPolicies" -> async(result) { control.policiesMap() }
+            "revokeVisual" -> async(result) {
+                val pkg = call.argument<String>("package")
+                pkg != null && control.setPolicies(mapOf("visualPackages" to control.policies().visualPackages.filterNot { it == pkg }))
+            }
             "setPolicies" -> async(result) { control.setPolicies(call.arguments as? Map<*, *>) }
             "actionLog" -> result.success(control.log.toMaps(call.argument<Int>("limit") ?: 100))
             // l10n:keep agent stop reason

@@ -9421,6 +9421,12 @@ class L10nZh extends L10n {
   String get petActionVoiceStart => '开始录音';
 
   @override
+  String get phoneVisualGrantsTitle => '截图操作权限';
+
+  @override
+  String get phoneVisualGrantRevoke => '点击撤销此应用的截图点按与输入权限';
+
+  @override
   String get phoneDiagnosticsCollecting => '正在收集…';
 
   @override

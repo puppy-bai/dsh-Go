@@ -17396,6 +17396,18 @@ abstract class L10n {
   /// **'开始录音'**
   String get petActionVoiceStart;
 
+  /// No description provided for @phoneVisualGrantsTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'截图操作权限'**
+  String get phoneVisualGrantsTitle;
+
+  /// No description provided for @phoneVisualGrantRevoke.
+  ///
+  /// In zh, this message translates to:
+  /// **'点击撤销此应用的截图点按与输入权限'**
+  String get phoneVisualGrantRevoke;
+
   /// No description provided for @phoneDiagnosticsCollecting.
   ///
   /// In zh, this message translates to:

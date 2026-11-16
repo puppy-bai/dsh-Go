@@ -62,6 +62,70 @@ object PhoneToolCatalog {
     // l10n:keep agent tool catalog
     private val SCREEN_ID = str("屏幕号，如 s7（主屏）或 b3（后台屏），取自最近一次返回的屏幕")
 
+    private val SEND_SCOPE = mapOf(
+        "type" to "object", "additionalProperties" to false, "required" to listOf("app", "recipient", "text"),
+        "description" to "本次发送范围：首次确认联系人和完整正文，同一手机任务内后续调用原样携带以复用；变更任一字段重新确认，任务结束失效。仅用于搜索联系人、输入、粘贴、核对和发送；每步仍须核对真实聊天对象与草稿，不能用于其他敏感动作。",
+        "properties" to linkedMapOf(
+            "app" to str("发送应用完整包名，必须等于当前应用"),
+            "recipient" to str("明确联系人/群名，1–200字；同名时先核对身份"),
+            "text" to str("用户要发送的完整原文，1–2000字；不得截断或改写"),
+        ),
+    )
+
+    private val RUN_CONDITION = mapOf(
+        "type" to "object", "additionalProperties" to false, "properties" to mapOf(
+            "text" to str("当前可见文字；树不可读则交回 AI，不能当作不存在"),
+            "match" to enum(listOf("contains", "exact", "normalized"), "文字匹配方式"),
+            "variable" to str("本次变量名，与 text 二选一"), "equals" to emptyMap<String, Any>(),
+            "not" to bool("取反"),
+        ),
+    )
+    private val RUN_SELECTOR = mapOf(
+        "type" to "object", "additionalProperties" to false, "properties" to mapOf(
+            "text" to str("可见文字"), "viewId" to str("资源 ID"), "description" to str("内容说明"),
+            "role" to str("目标角色"), "parentText" to str("可见祖先文字"),
+            "match" to enum(listOf("contains", "exact", "normalized"), "匹配方式"),
+            "enabled" to bool("是否启用"), "visible" to mapOf("type" to "boolean", "enum" to listOf(true)), "unique" to mapOf("type" to "boolean", "enum" to listOf(true)),
+        ),
+    )
+    private val RUN_GESTURE_STEPS = mapOf(
+        "type" to "array", "items" to mapOf("type" to "object", "required" to listOf("kind"),
+            "additionalProperties" to false, "properties" to mapOf(
+                "kind" to enum(GesturePlan.KINDS, "手势类型"), "x" to int("起点X"), "y" to int("起点Y"),
+                "x2" to int("终点X"), "y2" to int("终点Y"), "duration" to int("1–60000毫秒"),
+                "gap" to int("双击间隔40–300毫秒"), "spread" to int("双指缩放像素"),
+                "points" to mapOf("type" to "array", "items" to mapOf("type" to "array", "items" to mapOf("type" to "integer"))),
+            )),
+    )
+    private fun runSteps(depth: Int): Map<String, Any?> = mapOf(
+        "type" to "array",
+        "items" to mapOf(
+            "type" to "object", "additionalProperties" to false, "required" to listOf("op"),
+            "properties" to linkedMapOf(
+                "op" to enum(RoutinePlan.CHAT_OPS.toList(), "动作；不支持 ai/plugin 或任意脚本"),
+                "app" to str("open 的目标，必须属于 apps"), "target" to str("可见文字/提示/viewId"),
+                "selector" to RUN_SELECTOR, "long" to bool("长按"), "text" to str("输入或检查文字"),
+                "submit" to bool("输入后提交"), "direction" to enum(DIRECTIONS, "滚动方向"),
+                "until" to mapOf("anyOf" to listOf(mapOf("type" to "string"), RUN_CONDITION), "description" to "scroll 只用文字；repeat 只用条件对象"),
+                "max" to int("滚动上限1–20"),
+                "ms" to int("固定等待0–120000毫秒，旧格式最多10000"),
+                "timeoutMs" to int("文字等待250–30000毫秒，旧格式最多10000"),
+                "match" to enum(listOf("contains", "exact", "normalized"), "匹配方式"),
+                "key" to enum(listOf("back"), "返回键"), "requireText" to str("前置文字"), "expect" to str("后置文字"),
+                "condition" to RUN_CONDITION, "count" to int("repeat次数1–100"),
+                "then" to if (depth > 0) runSteps(depth - 1) else array("同格式子步骤；总深度上限4，执行前完整校验"),
+                "else" to if (depth > 0) runSteps(depth - 1) else array("同格式子步骤"),
+                "steps" to mapOf("anyOf" to listOf(if (depth > 0) runSteps(depth - 1) else array("repeat子步骤"), RUN_GESTURE_STEPS)),
+                "gap" to int("gesture各手势间隔0–5000毫秒"),
+                "name" to str("find/read_text/set 的本次变量名"), "value" to emptyMap<String, Any>(),
+                "observation" to str("AI 已看到的截图编号；视觉动作必须在本次调用首次读屏/写操作前执行，执行后交回 AI"),
+                "x" to int("截图像素 X"), "y" to int("截图像素 Y"), "note" to str("坐标用途"),
+            ),
+        ),
+    )
+
+    private val RUN_STEPS = runSteps(1)
+
     val tools: List<Tool> = listOf(
         Tool(
             APPS,
@@ -202,6 +266,7 @@ object PhoneToolCatalog {
                 "text" to str("按钮/条目上的文字，按名字点（与 id 二选一）"),
                 // l10n:keep agent tool catalog
                 "long" to bool("长按"),
+                "send" to SEND_SCOPE,
             ),
             listOf("screen"),
         ),
@@ -217,13 +282,14 @@ object PhoneToolCatalog {
                 "text" to str("要输入的文字"),
                 // l10n:keep agent tool catalog
                 "submit" to bool("输入后提交 / 发送"),
+                "send" to SEND_SCOPE,
             ),
             listOf("screen", "id", "text"),
         ),
         Tool(
             INPUT,
             // l10n:keep agent tool catalog
-            "一个调用完成「点输入框 → 写入 → 回读 → 收键盘」：按标号截图的像素坐标 x,y 点一下，把文字写进弹出的输入框；WebView 不认时自动改用剪贴板 + 粘贴。替代 screen + tap + type 三步。坐标取最近一次 screen 的标号截图（先 screen 加 image）。返回新屏幕。密码框会拒绝，每次都要用户确认。",
+            "按最新截图坐标聚焦并输入，优先写入可编辑节点；无节点时准备剪贴板并打开可见粘贴菜单，返回 need-visual-paste 和截图给当前 AI，尚未完成输入；随后按新图点粘贴并核对草稿。不能把准备剪贴板当作已发送。每 App 首次确认视觉权限，此后仍遵守普通手机操控授权。密码框拒绝。",
             linkedMapOf(
                 // l10n:keep agent tool catalog
                 "observation" to str("那张标号截图的屏幕号"),
@@ -235,6 +301,7 @@ object PhoneToolCatalog {
                 "text" to str("要填入的文字"),
                 // l10n:keep agent tool catalog
                 "submit" to bool("写入后按回车 / 发送"),
+                "send" to SEND_SCOPE,
             ),
             listOf("observation", "x", "y", "text"),
         ),
@@ -266,7 +333,7 @@ object PhoneToolCatalog {
         Tool(
             TAP_XY,
             // l10n:keep agent tool catalog
-            "按标号截图的像素坐标点击，只在元素里找不到目标时用；每次都要用户确认。",
+            "按最新截图的像素坐标点击，文字树不可用但截图正常时可用。每 App 首次确认视觉权限，此后遵守普通手机操控授权。截图、前台或几何状态失效时拒绝并要求重新看图。",
             linkedMapOf(
                 // l10n:keep agent tool catalog
                 "observation" to str("那张截图的屏幕号"),
@@ -274,13 +341,14 @@ object PhoneToolCatalog {
                 "x" to int("横坐标（像素，从 0 开始）"),
                 // l10n:keep agent tool catalog
                 "y" to int("纵坐标（像素，从 0 开始）"),
+                "send" to SEND_SCOPE,
             ),
             listOf("observation", "x", "y"),
         ),
         Tool(
             GESTURE,
             // l10n:keep agent tool catalog
-            "按标号截图的像素坐标做手势，元素里找不到目标、或需要长时间按住 / 拖动 / 双击 / 双指缩放时用。tap 点击、long 长按任意毫秒、double 双击、swipe 滑动、path 沿路径滑、pinch 双指缩放；steps 按顺序连续执行。坐标取最近一次 screen 的标号截图（W×H）。每次都要用户确认。",
+            "按最新截图像素做手势：tap点击、long长按、double双击、swipe滑动、path路径、pinch双指缩放。每 App 首次确认视觉权限，此后遵守普通手机操控授权。steps只描述这一屏的手势，不得跨页面串旧坐标。",
             linkedMapOf(
                 // l10n:keep agent tool catalog
                 "observation" to str("那张标号截图的屏幕号"),
@@ -311,14 +379,18 @@ object PhoneToolCatalog {
         Tool(
             RUN,
             // l10n:keep agent tool catalog
-            "在一个应用内顺序执行最多 60 步（240 秒预算），每步重新读屏按文字找目标；普通操作整批确认，发送/提交等敏感操作仍单独确认。失败立即停，不自动重试写操作。返回 trace/completed/nextStep；dryRun 仅检查整批参数，不读屏不操作。先 open 并 screen 核对包名。宏不支持坐标或无限循环。",
+            "普通聊天直接执行手机步骤，无需创建或保存任务。新调用使用 schema:2、apps、steps：支持选择器、查找、等待、滚动、if、有限 repeat、变量、open 和 yield；复杂判断或无障碍不可读时返回 need-ai 与截图给当前会话，不新建会话、不留任务锁。范围内沿用手机操控授权。坐标动作绑定最近截图，执行后立即返回，不能跨页面串旧坐标。最多60个定义节点/500个执行节点/240秒；失败不重放发送。旧 app/steps（不传schema）继续使用旧单应用宏；dryRun不操作手机。",
             linkedMapOf(
                 "app" to str("预期当前应用的完整包名，切到别的应用立即停止"),
-                "steps" to array("1–60 步。op: tap{target,long?,expect?}; type{target,text,submit?,expect?}; scroll{direction,until?,max?,expect?}; wait{ms:0–10000} 或 wait{text,timeoutMs:250–10000}; assert{text}; snapshot{}; key{key:back,expect?}。target 是可见文字/提示/viewId 片段，不能是缓存编号。各步可带 requireText 前置检查。expect 在动作后最多等5秒。"),
+                "schema" to mapOf("type" to "integer", "enum" to listOf(2)),
+                "send" to SEND_SCOPE,
+                "apps" to mapOf("type" to "array", "items" to mapOf("type" to "string")),
+                "forbiddenTargets" to mapOf("type" to "array", "items" to mapOf("type" to "string"), "description" to "不可点目标；非空时坐标动作拒绝"),
+                "steps" to RUN_STEPS,
                 "dryRun" to bool("仅检查参数，不执行；默认 false"),
                 "startAt" to int("从第几步开始，默认1；恢复必须先读屏，并给该步 requireText，不能盲重放"),
             ),
-            listOf("app", "steps"),
+            listOf("steps"),
         ),
         Tool(
             TASK,

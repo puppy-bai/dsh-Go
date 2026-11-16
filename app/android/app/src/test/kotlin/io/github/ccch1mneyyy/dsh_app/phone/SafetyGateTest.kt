@@ -136,6 +136,78 @@ class SafetyGateTest {
         assertEquals("refused:no-gate", result.decision)
     }
 
+    @Test fun visualConsentNamesCurrentCoordinateAndKeepsEveryWriteConfirmation() {
+        val tasks = PhoneTasks()
+        tasks.begin()
+        var policies = PhonePolicies(confirmEveryWritePackages = listOf("example.app"))
+        var choice = Decision.ALLOW_ONCE
+        var visualSaves = 0
+        var request: ConfirmRequest? = null
+        val gate = SafetyGate({ policies }, tasks, {
+            object : UserGate {
+                override fun confirm(value: ConfirmRequest): Decision { request = value; return choice }
+                override fun handoff(reason: String, timeoutMs: Long) = HandoffResult.STOP
+                override fun status(text: String?) {}
+            }
+        }, onVisualApproved = { pkg ->
+            visualSaves++
+            policies = policies.copy(visualPackages = policies.visualPackages + pkg)
+            true
+        })
+        val point = 12 to 34
+
+        val once = gate.resolve(gate.checkWrite(WriteKind.TAP_XY, null, "example.app", "Example", point = point), SerialWorker.Scope())
+        assertEquals("confirmed", (once as SafetyGate.Result.Go).decision)
+        assertTrue(request!!.firstInApp)
+        assertTrue(request!!.sentence.contains("点截图上的位置 (12, 34)"))
+        assertEquals(0, visualSaves)
+        assertFalse("example.app" in policies.visualPackages)
+
+        choice = Decision.ALLOW_APP_FOR_TASK
+        val remembered = gate.resolve(gate.checkWrite(WriteKind.TAP_XY, null, "example.app", "Example", point = point), SerialWorker.Scope())
+        assertEquals("confirmed-app", (remembered as SafetyGate.Result.Go).decision)
+        assertEquals(1, visualSaves)
+        assertTrue("example.app" in policies.visualPackages)
+        assertFalse(tasks.isApproved("example.app"))
+        assertEquals("every-write", (gate.checkWrite(WriteKind.TAP_XY, null, "example.app", "Example", point = point) as SafetyGate.Verdict.Confirm).reason)
+    }
+
+    @Test fun blindInputConfirmationShowsTheTextBeforeItCanBePasted() {
+        val tasks = PhoneTasks().apply { begin() }
+        val gate = SafetyGate({ PhonePolicies() }, tasks, {
+            object : UserGate {
+                override fun confirm(request: ConfirmRequest) = Decision.DENY
+                override fun handoff(reason: String, timeoutMs: Long) = HandoffResult.STOP
+                override fun status(text: String?) {}
+            }
+        })
+        val verdict = gate.checkWrite(WriteKind.INPUT, null, "example.app", "Example", typed = "你好", point = 12 to 34)
+        assertTrue((verdict as SafetyGate.Verdict.Confirm).request.sentence.contains("你好"))
+    }
+
+    @Test fun blindInputStillConfirmsAfterVisualAccessAndGlobalApproval() {
+        val tasks = PhoneTasks().apply { begin() }
+        val gate = SafetyGate({ PhonePolicies(confirmMode = ConfirmMode.ALWAYS, visualPackages = listOf("example.app")) }, tasks, { null })
+        val verdict = gate.checkWrite(WriteKind.INPUT, null, "example.app", "Example", typed = "你好", point = 12 to 34)
+        assertEquals("visual-input", (verdict as SafetyGate.Verdict.Confirm).reason)
+        assertFalse(verdict.request.offerTaskWaiver)
+        assertTrue(verdict.request.sentence.contains("你好"))
+    }
+
+    @Test fun visualConsentRefusesTheCoordinateActionWhenSavingFails() {
+        val tasks = PhoneTasks()
+        tasks.begin()
+        val gate = SafetyGate({ PhonePolicies() }, tasks, {
+            object : UserGate {
+                override fun confirm(request: ConfirmRequest) = Decision.ALLOW_APP_FOR_TASK
+                override fun handoff(reason: String, timeoutMs: Long) = HandoffResult.STOP
+                override fun status(text: String?) {}
+            }
+        }, onVisualApproved = { false })
+        val verdict = gate.checkWrite(WriteKind.TAP_XY, null, "example.app", "Example", point = 12 to 34)
+        assertEquals("refused:visual-grant", (gate.resolve(verdict, SerialWorker.Scope()) as SafetyGate.Result.No).decision)
+    }
+
     @Test fun filtersSensitiveImagesWithoutChangingOrdinaryScreens() {
         val gate = SafetyGate({ PhonePolicies() }, PhoneTasks(), { null })
         val plain = ScreenSnapshot("b1", "ordinary", "Example", "example.app", image = byteArrayOf(1, 2), imageMime = "image/png")

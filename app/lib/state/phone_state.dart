@@ -239,6 +239,15 @@ class PhoneController extends Notifier<PhoneState> {
   Future<PhoneResult> adbConnect({int? port}) => _thenRefresh(_channel.adbConnect(port: port));
 
   /// Changes one app's rule; false when the native side refused (nothing changes).
+  Future<bool> revokeVisual(String package) async {
+    final ok = await _channel.revokeVisual(package);
+    if (!ok || !ref.mounted) return false;
+    await refreshStatus();
+    final current = await _channel.getPolicies();
+    if (ref.mounted && current != null) state = state.copyWith(policies: current);
+    return true;
+  }
+
   Future<bool> setRule(String package, AppRule rule) async {
     final current = state.policies;
     if (current == null) return false;

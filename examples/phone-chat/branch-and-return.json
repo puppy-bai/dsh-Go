@@ -1,0 +1,13 @@
+{
+  "schema": 2,
+  "apps": ["example.phone.lab"],
+  "steps": [
+    {
+      "op": "if",
+      "condition": {"text": "已完成", "match": "contains"},
+      "then": [{"op": "set", "name": "alreadyDone", "value": true}],
+      "else": [{"op": "read_text", "target": "当前状态", "name": "status"}]
+    },
+    {"op": "yield"}
+  ]
+}

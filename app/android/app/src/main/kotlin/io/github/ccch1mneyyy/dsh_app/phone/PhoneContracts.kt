@@ -232,6 +232,8 @@ data class ConfirmRequest(
      * gate that ignores it still answers correctly, just asks more.
      */
     val offerTaskWaiver: Boolean = false,
+    /** Approval covers the explicitly displayed recipient and full message, rather than one step. */
+    val sendScope: Boolean = false,
 )
 
 /** [ALLOW_ALL_FOR_TASK]: nothing else in this task is asked (only offered with [ConfirmRequest.offerTaskWaiver]). */

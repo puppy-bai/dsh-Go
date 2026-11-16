@@ -22,6 +22,7 @@ final automationCoordinatorProvider = Provider<void>((ref) {
   Future<void> poll() async {
     if (disposed || polling) return;
     polling = true;
+    Map<String, Object?>? dispatch;
     try {
       final response = await channel.invoke('automationStatus');
       if (disposed || response['ok'] == false) return;
@@ -53,6 +54,7 @@ final automationCoordinatorProvider = Provider<void>((ref) {
       if (state != 'awaiting_ai' || checkpoint is! String || checkpoint == sentCheckpoint) return;
       // An ambiguous prompt acknowledgement must not be replayed.
       sentCheckpoint = checkpoint;
+      dispatch = run;
       if (sessionId == null) {
         final created = await connection.client.createSession();
         if (created.sessionId.isEmpty) throw StateError('automation-session-unavailable');
@@ -73,8 +75,18 @@ final automationCoordinatorProvider = Provider<void>((ref) {
         timeZone: 'Asia/Shanghai',
       );
     } catch (_) {
-      // Uncertain model requests are handed back instead of submitted twice.
-      if (!disposed && ownerRun != null) await channel.control('Pause', ownerRun!);
+      // Only the failed dispatch may be paused; a late failure cannot pause its successor.
+      if (!disposed && dispatch != null) {
+        try {
+          await channel.invoke('automationPause', {
+            'runId': dispatch['runId'],
+            'checkpoint': dispatch['checkpoint'],
+            'dispatchEpoch': dispatch['dispatchEpoch'],
+          });
+        } catch (_) {
+          // Keep polling status, but never replay a prompt with an uncertain acknowledgement.
+        }
+      }
     } finally {
       polling = false;
     }
@@ -102,6 +114,6 @@ DSH Go 本地任务检查点，需要完成一个受限决策。先调用 mcp__p
 如果 kind=plugin，只能调用 pending 指定的已批准插件 tool 与 arguments，然后把实际回执作为 value 返回；超时或不明确不能补发、不能改走界面。不能凭推测声称已送达/已读。
 修复只处理尚未完成的剩余步骤；发送、提交等结果未知先检查，不能盲重放。修复轮数整次最多2轮，不能通过新启动任务重置额度。
 题目需读全题干与选项，未知或无法操作时暂停，不能假造答案正确或课程进度。任务 forbiddenTargets 和终点必须保留。
-若无法确定下一步或当前令牌失效，调用 task pause 并说明；不要自动 resume 用户暂停的任务。提交结果后等待本地继续，不循环轮询状态，不保存或修改长期授权。
+若当前令牌已失效或已被消费，停止处理这个旧检查点，不调用 pause/stop，不影响新进度。只有令牌仍有效且确实无法确定下一步时才调用 task pause 并说明；不要自动 resume 用户暂停的任务。提交结果后等待本地继续，不循环轮询状态，不保存或修改长期授权。
 ''';
 }

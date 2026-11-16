@@ -731,7 +731,7 @@ internal class ControlOverlay(private val service: AccessibilityService) : UserG
         fun decide(d: Decision) { if (pending.resolve(d)) main.post { if (pendingConfirm === pending) dismissConfirm() } }
         // 本任务免确认: the main choice waives the rest of the task. Otherwise, on the first action
         // in an app, the main choice allows that app for the rest of the task so later steps there
-        // don't ask again. "Only this step" stays available as the quieter option either way.
+        // don't ask again. A send scope instead names the exact send approved by both choices.
         val wide = request.offerTaskWaiver || request.firstInApp
         if (request.offerTaskWaiver) {
             val all4task = GuardedButton(service, armedAt).apply {
@@ -743,7 +743,11 @@ internal class ControlOverlay(private val service: AccessibilityService) : UserG
             card.addView(all4task, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(46)).apply { bottomMargin = dp(8) })
         } else if (request.firstInApp) {
             val app4task = GuardedButton(service, armedAt).apply {
-                text = if (app != null) AppStrings.get(service, R.string.overlay_allow_app_task, app) else AppStrings.get(service, R.string.overlay_allow_this_app_task)
+                text = when {
+                    request.sendScope -> AppStrings.get(service, R.string.phone_prompt_allow_send_visual)
+                    app != null -> AppStrings.get(service, R.string.overlay_allow_app_task, app)
+                    else -> AppStrings.get(service, R.string.overlay_allow_this_app_task)
+                }
                 style(this, c.accent, c.onAccent, c)
                 setOnClickListener { decide(Decision.ALLOW_APP_FOR_TASK) }
             }
@@ -756,7 +760,11 @@ internal class ControlOverlay(private val service: AccessibilityService) : UserG
         row.addView(textButton(AppStrings.get(service, R.string.overlay_decline), c.ink, c) { decide(Decision.DENY) }.apply { background = outlined(c) },
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(46)).apply { marginEnd = dp(8) })
         val allow = GuardedButton(service, armedAt).apply {
-            text = if (wide) AppStrings.get(service, R.string.overlay_allow_step) else AppStrings.get(service, R.string.overlay_allow_once)
+            text = when {
+                request.sendScope -> AppStrings.get(service, R.string.phone_prompt_allow_send)
+                wide -> AppStrings.get(service, R.string.overlay_allow_step)
+                else -> AppStrings.get(service, R.string.overlay_allow_once)
+            }
             if (wide) style(this, c.accentSoft, c.onAccentSoft, c) else style(this, c.accent, c.onAccent, c)
             setOnClickListener { decide(Decision.ALLOW_ONCE) }
         }

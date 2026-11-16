@@ -29,6 +29,7 @@ import io.github.ccch1mneyyy.dsh_app.phone.PhoneRegistry
 import io.github.ccch1mneyyy.dsh_app.phone.PhoneUnlocks
 import io.github.ccch1mneyyy.dsh_app.phone.PhoneScreen
 import io.github.ccch1mneyyy.dsh_app.phone.SafetyRules
+import io.github.ccch1mneyyy.dsh_app.phone.SensitiveWords
 import io.github.ccch1mneyyy.dsh_app.phone.ScreenSnapshot
 import io.github.ccch1mneyyy.dsh_app.phone.TargetInfo
 import io.github.ccch1mneyyy.dsh_app.phone.TextSelector
@@ -86,6 +87,7 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         val observedAt: Long,
     ) {
         @Volatile var image: ImageGeometry? = null
+        var visualFrame: VisualFrame? = null
     }
 
     fun close() {
@@ -140,6 +142,7 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
                             bytes = shot.bytes
                             mime = shot.mime
                             snap.image = shot.geometry
+                            snap.visualFrame = shot.frame
                             // l10n:keep agent screen result
                             text.append("\n截图上的数字是元素编号；tap_xy 和 gesture 用截图像素（${shot.geometry!!.width}×${shot.geometry.height}）。")
                             // l10n:keep agent screen result
@@ -505,13 +508,12 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         // l10n:keep agent screen result
         if (snap.protectedPage && !lifted.systemPages) return ActionResult(false, "这是系统权限 / 安全相关页面，DSH 不在这里点击。需要的话请用 handoff 交给用户。")
         // l10n:keep agent screen result
-        if (snap.hidden) return ActionResult(false, "当前无障碍根节点不可用，无法确认前台窗口，没有点击。请重新观察。", observeQuiet(), reasonCode = "observation-unavailable")
         val cap = capture()
         try {
             // l10n:keep agent screen result
-            if (cap.hiddenWindowTitle != null || cap.windows.isEmpty()) return ActionResult(false, "当前窗口观察不可用，原因尚未确认，没有操作。请重新观察。", toSnapshot(publish(cap, false)), reasonCode = "observation-unavailable")
+            if (cap.packageName == null || cap.windows.isEmpty()) return ActionResult(false, "无法确认当前前台窗口，没有操作。请重新观察。", toSnapshot(publish(cap, false)), reasonCode = "foreground-unknown")
             // l10n:keep agent screen result
-            if (!reusableCoordinates(cap, snap)) return ActionResult(false, "无法确认当前界面仍与截图一致，没有点击。请重新看屏幕。", toSnapshot(publish(cap, false)))
+            if (!reusableCoordinates(cap, snap, listOf(a.x to a.y))) return ActionResult(false, "无法确认当前界面仍与截图一致，没有点击。请重新看屏幕。", toSnapshot(publish(cap, false)))
         } finally { cap.recycle() }
         val before = clock.count
         // l10n:keep agent screen result
@@ -549,13 +551,12 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         // l10n:keep agent screen result
         if (snap.protectedPage && !lifted.systemPages) return ActionResult(false, "这是系统权限 / 安全相关页面，DSH 不在这里做手势。需要的话请用 handoff 交给用户。")
         // l10n:keep agent screen result
-        if (snap.hidden) return ActionResult(false, "当前无障碍根节点不可用，无法确认前台窗口，没有做手势。请重新观察。", observeQuiet(), reasonCode = "observation-unavailable")
         val cap = capture()
         try {
             // l10n:keep agent screen result
-            if (cap.hiddenWindowTitle != null || cap.windows.isEmpty()) return ActionResult(false, "当前窗口观察不可用，原因尚未确认，没有操作。请重新观察。", toSnapshot(publish(cap, false)), reasonCode = "observation-unavailable")
+            if (cap.packageName == null || cap.windows.isEmpty()) return ActionResult(false, "无法确认当前前台窗口，没有操作。请重新观察。", toSnapshot(publish(cap, false)), reasonCode = "foreground-unknown")
             // l10n:keep agent screen result
-            if (!reusableCoordinates(cap, snap)) return ActionResult(false, "无法确认当前界面仍与截图一致，没有做手势。请重新看屏幕。", toSnapshot(publish(cap, false)))
+            if (!reusableCoordinates(cap, snap, a.strokes.flatMap { it.points })) return ActionResult(false, "无法确认当前界面仍与截图一致，没有做手势。请重新看屏幕。", toSnapshot(publish(cap, false)))
         } finally { cap.recycle() }
         val before = clock.count
         // l10n:keep agent screen result
@@ -629,13 +630,12 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         // l10n:keep agent screen result
         if (snap.protectedPage && !lifted.systemPages) return ActionResult(false, "这是系统权限 / 安全相关页面，DSH 不在这里输入。需要的话请用 handoff 交给用户。")
         // l10n:keep agent screen result
-        if (snap.hidden) return ActionResult(false, "当前无障碍根节点不可用，无法确认前台窗口，没有输入。请重新观察。", observeQuiet(), reasonCode = "observation-unavailable")
         val cap = capture()
         try {
             // l10n:keep agent screen result
-            if (cap.hiddenWindowTitle != null || cap.windows.isEmpty()) return ActionResult(false, "当前窗口观察不可用，原因尚未确认，没有操作。请重新观察。", toSnapshot(publish(cap, false)), reasonCode = "observation-unavailable")
+            if (cap.packageName == null || cap.windows.isEmpty()) return ActionResult(false, "无法确认当前前台窗口，没有操作。请重新观察。", toSnapshot(publish(cap, false)), reasonCode = "foreground-unknown")
             // l10n:keep agent screen result
-            if (!reusableCoordinates(cap, snap)) return ActionResult(false, "无法确认当前界面仍与截图一致，没有输入。请重新看屏幕。", toSnapshot(publish(cap, false)))
+            if (!reusableCoordinates(cap, snap, listOf(a.x to a.y))) return ActionResult(false, "无法确认当前界面仍与截图一致，没有输入。请重新看屏幕。", toSnapshot(publish(cap, false)))
         } finally {
             cap.recycle()
         }
@@ -644,11 +644,26 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         if (!actuator.tap(point.first, point.second)) return ActionResult(false, "系统没有接受这次点击，所以没有输入。", observeQuiet())
         clock.settle(before, 800, 250, 2_500) { cancelled(gen) }
 
+        if (snap.hidden || snap.unreadable) {
+            if (a.submit) return ActionResult(false, "无节点输入不能自动提交。请只输入后从截图核对草稿。", observe(detail = false, image = true), reasonCode = "visual-submit-unverified") // l10n:keep agent screen result
+            if (cancelled(gen) || foregroundPackage() != snap.packageName) return ActionResult(false, "前台应用已变化，没有写入。", observeQuiet(), reasonCode = "interrupted") // l10n:keep agent screen result
+            actuator.focusedEditor()?.let { editor ->
+                try {
+                    if (secretEditor(editor)) return ActionResult(false, "焦点落在密码 / 验证码 / 支付码输入框上，DSH 不代填。请用 handoff 让用户自己来。", observeQuiet(), reasonCode = "secret-field")
+                } finally {
+                    editor.recycle()
+                }
+            }
+            if (!actuator.copy(a.text)) return ActionResult(false, "无法准备剪贴板，没有写入。", observeQuiet(), reasonCode = "clipboard-unavailable") // l10n:keep agent screen result
+            actuator.hold(point.first, point.second, 600)
+            clock.pause(400) { cancelled(gen) }
+            return ActionResult(true, "文字已放入系统剪贴板，尚未确认写入。请看当前截图，若出现粘贴菜单则用新截图坐标点击粘贴，再核对输入框内容；不要直接发送。", observe(detail = false, image = true), reasonCode = "need-visual-paste") // l10n:keep agent screen result
+        }
         var wrote = false
         // l10n:keep agent screen result
         var refusal: String? = null
         fun write(editor: AccessibilityNodeInfo): Boolean = try {
-            if (editor.isPassword) {
+            if (secretEditor(editor)) {
                 // l10n:keep agent screen result
                 refusal = "焦点落在密码框上，DSH 不替用户填密码。请用 handoff 让用户自己来。"
                 false
@@ -670,7 +685,7 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         if (!wrote && refusal == null && actuator.copy(a.text)) {
             actuator.focusedEditor()?.let { editor ->
                 try {
-                    if (editor.isPassword) {
+                    if (secretEditor(editor)) {
                         // l10n:keep agent screen result
                         refusal = "焦点落在密码框上，DSH 不替用户填密码。请用 handoff 让用户自己来。"
                     } else {
@@ -727,6 +742,11 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
         // l10n:keep agent screen result
         return after(before, snap, gen, if (a.submit) "已按坐标输入 ${a.text.length} 字并提交。" else "已按坐标输入 ${a.text.length} 字。")
     }
+
+    private fun secretEditor(node: AccessibilityNodeInfo): Boolean =
+        node.isPassword || SensitiveWords.secretHit(
+            node.hintText?.toString(), node.contentDescription?.toString(), node.viewIdResourceName,
+        ) != null
 
     /** Waits for the UI to settle, reads the new screen (`+` marks) and says whether anything changed. */
     private fun after(before: Long, previous: Snapshot?, gen: Long, message: String, scrolled: Boolean = false): ActionResult {
@@ -812,15 +832,17 @@ internal class MainScreenDriver(private val service: PhoneA11yService, private v
 
     private fun unavailable(cap: Capture) = WindowContent.unavailable(cap.hiddenWindowTitle != null, cap.unreadableWindowTitle != null, cap.windows)
 
-    /** An empty tree is not a policy refusal; a fresh screenshot still binds a stable window. */
-    private fun reusableCoordinates(cap: Capture, snap: Snapshot): Boolean {
+    /** Root readability and visual validity are independent. Opaque trees need an unchanged frame. */
+    private fun reusableCoordinates(cap: Capture, snap: Snapshot, points: List<Pair<Int, Int>> = emptyList()): Boolean {
         val now = observation(cap)
         if (now.reusableCoordinates(snap.observation)) return true
-        return snap.image != null && !snap.hidden && cap.hiddenWindowTitle == null &&
-            !now.incomplete && !snap.observation.incomplete &&
-            clock.count == snap.eventCount && SystemClock.uptimeMillis() - snap.observedAt <= 5_000 &&
-            now.keyboardShown != null && now.keyboardShown == snap.observation.keyboardShown &&
-            now.sameContext(snap.observation) && now.elements == snap.observation.elements
+        if (snap.image == null || now.incomplete || snap.observation.incomplete ||
+            now.keyboardShown == null || now.keyboardShown != snap.observation.keyboardShown ||
+            !now.sameContext(snap.observation) ||
+            SystemClock.uptimeMillis() - snap.observedAt !in 0..60_000) return false
+        val previous = snap.visualFrame ?: return false
+        val shot = shooter.shoot(cap.windows.singleOrNull(), cap.screen, snap.screen.elements, ScreenShooter.sensitiveBounds(cap.windows), 2_000)
+        return !shot.secure && shot.frame?.matches(previous, points) == true
     }
 
     private fun observation(cap: Capture) = ScreenObservation(

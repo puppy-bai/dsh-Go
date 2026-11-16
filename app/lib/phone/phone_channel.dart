@@ -707,6 +707,7 @@ class PhonePolicies {
   const PhonePolicies({
     this.denyPackages = const [],
     this.confirmEveryWritePackages = const [],
+    this.visualPackages = const [],
     this.labels = const {},
     this.defaultDeny = const [],
     this.defaultConfirm = const [],
@@ -720,6 +721,7 @@ class PhonePolicies {
     return PhonePolicies(
       denyPackages: _strings(m['denyPackages']),
       confirmEveryWritePackages: _strings(m['confirmEveryWritePackages']),
+      visualPackages: _strings(m['visualPackages']),
       labels: {
         for (final e in _map(m['labels']).entries)
           if (e.key is String && e.value is String) e.key as String: e.value as String,
@@ -737,6 +739,7 @@ class PhonePolicies {
 
   final List<String> denyPackages;
   final List<String> confirmEveryWritePackages;
+  final List<String> visualPackages;
 
   /// Package → app label, from the native side.
   final Map<String, String> labels;
@@ -757,6 +760,7 @@ class PhonePolicies {
   };
 
   PhonePolicies withConfirmMode(PhoneConfirmMode mode) => PhonePolicies(
+    visualPackages: visualPackages,
     denyPackages: denyPackages,
     confirmEveryWritePackages: confirmEveryWritePackages,
     labels: labels,
@@ -767,6 +771,7 @@ class PhonePolicies {
   );
 
   PhonePolicies withUnlock(PhoneUnlock unlock, bool on) => PhonePolicies(
+    visualPackages: visualPackages,
     denyPackages: denyPackages,
     confirmEveryWritePackages: confirmEveryWritePackages,
     labels: labels,
@@ -807,6 +812,7 @@ class PhonePolicies {
     }
     return PhonePolicies(
       denyPackages: deny,
+      visualPackages: visualPackages,
       confirmEveryWritePackages: confirm,
       labels: labels,
       defaultDeny: defaultDeny,
@@ -991,6 +997,7 @@ class PhoneChannel {
   }
 
   Future<bool> setPolicies(PhonePolicies policies) => _bool('setPolicies', policies.toWire());
+  Future<bool> revokeVisual(String package) => _bool('revokeVisual', {'package': package});
 
   /// Lifts or restores one hard rule, and nothing else (`setPolicies` keeps
   /// what it isn't sent).

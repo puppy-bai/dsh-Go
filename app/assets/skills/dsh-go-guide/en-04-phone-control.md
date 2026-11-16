@@ -1,5 +1,23 @@
 # Phone control
 
+## Local steps in ordinary chat
+
+Describe your goal in chat without creating an automation task. AI can choose a single phone action or the enhanced mcp__phone__run for a short sequence. New calls use schema:2, apps and steps, with selectors, waiting, finding, scrolling, simple conditions and bounded loops. A complex decision or unreadable accessibility tree returns status:need-ai, progress and an available screenshot to the current conversation. It does not create an auxiliary session or require resuming from the task page.
+
+Each call permits at most 60 defined nodes, 500 executed nodes and 240 seconds of active execution. yield returns to the current AI; there is no nested model-calling ai node. Existing calls without schema retain the legacy single-app macro behavior. Saved tasks continue to use their separate schema:1 format.
+
+Existing phone-control authorization applies. A task waiver or Always skip works only within its existing policy. The task library's global automatic switch does not silently authorize ordinary chat. Saving a reusable workflow still requires your approval.
+
+A message send can declare `send:{app,recipient,text}` with the full package name, recipient and complete message. It is optional on individual `tap`, `type`, `input` and `tap_xy` calls or at the top level of `schema:2 run`; subsequent calls for the same send must repeat the same scope. The first confirmation displays the entire scope. Choosing “Allow this send” lets searching, typing, pasting and sending share approval within the current phone task. A different app, recipient or message requires confirmation again. The grant expires when the reply, stop or idle expiry ends the phone task; it is not permanent permission across conversations. Rejection or timeout retains no grant.
+
+Search input may contain only the declared recipient and must not submit; message input must match the complete declared text. Known payment, deletion, authorization and other sensitive actions cannot borrow a send scope. Calls without `send` keep every-write app and critical-action rules; node-free coordinate input still confirms the text individually, even in global automatic mode.
+
+Tree availability and screenshot availability are reported separately. A readable screenshot can be used after you grant visual access for that app. Choosing to remember it persists visual access until revoked in the phone-control app list. Visual access is independent of send approval and does not authorize arbitrary pages, recipients or messages. First visual access and send approval can share one card: “Allow this send and remember visual access” saves visual access, while “Allow this send” permits only this visual step and may prompt again for later visual actions. If accessibility identifies the focused editor as a password field, input stops before copying to the clipboard. Explicit system protection, an unknown foreground app, a changed image or unverifiable coordinates still stop execution with a reason.
+
+Coordinates belong to the image AI just saw. Navigation, scrolling or a keyboard change invalidates old coordinates. If node-free input returns need-visual-paste, text has only been prepared on the clipboard and the paste menu requested: it is not proof that text was entered. AI must inspect the new image, locate Paste and verify the draft afterwards. With no text tree, AI must check the actual recipient and draft in fresh images; declaring a send scope does not mechanically prove that the on-screen recipient is correct. An uncertain send must be inspected, not repeated; a visible new message does not establish delivery or read status.
+
+See examples/phone-chat/ for placeholder test plans. A valid schema is not proof that an actual app can run the plan. Observe its current screen before generating a sequence.
+
 Let DSH read the screen, tap and type to get things done on your phone. Pause or stop it anytime. Phone control works only with this phone's engine and isn't loaded in Safe mode.
 
 ## Turn it on

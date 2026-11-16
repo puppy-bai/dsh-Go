@@ -135,6 +135,12 @@ class AutomationRunner(
         return status()
     }
 
+    fun pauseCheckpoint(id: String, token: String, epoch: Long, pauseReason: String): Map<String, Any?> = synchronized(monitor) {
+        requireRun(id)
+        require(state == "awaiting_ai" && checkpoint == token && dispatchEpoch == epoch) { "stale-checkpoint" }
+        pause(id, pauseReason)
+    }
+
     fun resume(id: String): Map<String, Any?> {
         synchronized(monitor) {
             requireRun(id)
@@ -497,7 +503,14 @@ class AutomationService(
                 else mapOf("run" to runner.start(proposal, values))
             }
             "status" -> mapOf("run" to visibleStatus(), "globalAuto" to store.globalAuto(), "storeError" to (store.loadError ?: persistenceError))
-            "pause" -> mapOf("run" to runner.pause(AutomationPlan.string(args, "runId")))
+            "pause" -> {
+                val id = AutomationPlan.string(args, "runId")
+                if (args.containsKey("checkpoint")) {
+                    require(trusted) { "user-approval-required" }
+                    val epoch = args["dispatchEpoch"] as? Number ?: error("missing-dispatchEpoch")
+                    mapOf("run" to runner.pauseCheckpoint(id, AutomationPlan.string(args, "checkpoint"), epoch.toLong(), "checkpoint-dispatch-failed"))
+                } else mapOf("run" to runner.pause(id))
+            }
             "resume" -> { require(trusted) { "user-resume-required" }; mapOf("run" to runner.resume(AutomationPlan.string(args, "runId"))) }
             "stop" -> mapOf("run" to runner.stop(AutomationPlan.string(args, "runId")))
             "ai_result", "repair" -> mapOf("run" to runner.answer(AutomationPlan.string(args, "runId"), AutomationPlan.string(args, "checkpoint"), args["steps"]?.let(AutomationPlan::list), args["value"], action == "repair"))

@@ -47,6 +47,7 @@ List<String> listedPackages(PhoneState state) {
     ...p.confirmEveryWritePackages,
     ...p.defaultDeny,
     ...p.defaultConfirm,
+    ...p.visualPackages,
     ...state.retained,
   }.toList();
 }
@@ -95,6 +96,24 @@ class PhoneAppRulesPage extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 24),
+          if (policies.visualPackages.isNotEmpty) ...[
+            ListPageCard(
+              title: l10n.phoneVisualGrantsTitle,
+              children: [
+                for (final package in policies.visualPackages)
+                  ListPageRow(
+                    icon: AppIcons.allowed,
+                    title: policies.labelFor(package),
+                    subtitle: l10n.phoneVisualGrantRevoke,
+                    onTap: () async {
+                      final ok = await ref.read(phoneProvider.notifier).revokeVisual(package);
+                      if (!ok && context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.phoneAppRulesSaveFailed)));
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 24),
+          ],
           ListPageCard(
             children: [
               ListPageRow(

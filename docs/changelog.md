@@ -2,6 +2,26 @@
 
 每个版本先中文、后英文。发版时把对应版本的正文（不含版本标题）作为 Release 正文，见 `docs/release.md`。
 
+## 1.0.19 · 2026-11-16 候选 / Candidate
+
+### 中文
+
+- 普通聊天的 `mcp__phone__run` 新增 `schema:2`，支持声明应用范围、文字选择器、等待、查找、`if`、有限 `repeat` 和 `yield`。确定步骤在本机执行；需要判断时把进度、原因与可用截图返回原会话，不为执行段创建检查点新聊天，也不要求到任务页恢复。
+- 支持在执行段中使用截图坐标点击、输入和手势。每次视觉动作后交回原会话重新判断，页面变化后不能复用旧坐标；结果不明确的发送或提交不得自动重放。无节点输入返回 `need-visual-paste` 只表示已准备剪贴板并尝试打开粘贴菜单，需要根据新截图粘贴、核对草稿后再决定后续步骤。
+- 新增明确的发送范围 `send:{app,recipient,text}`：首次展示应用、联系人和完整正文并确认后，同一手机任务内的搜索、输入、粘贴和发送可跨单步调用或 `schema:2 run` 共用授权。换范围或任务结束后需重新确认；拒绝不留下授权，已知付款、删除等其他敏感动作不能借用发送授权。未声明范围时继续沿用原规则，无节点坐标输入仍逐次确认。
+- 首次按应用确认视觉操作权限，可与发送范围合并提示；“仅此一步”不保存视觉权限，“本应用本任务”会记住该应用的视觉权限，可在手机操控的应用名单撤销。视觉权限与本次发送授权独立；只允许一步视觉操作后，后续视觉动作仍可能再次询问。
+- 自动任务页及 `schema:1` 保存任务入口继续保留，与普通聊天执行段分别使用。任务页的全局自动开关不扩大普通聊天权限；已有任务检查点增加过期消费者保护，避免迟到结果影响后续进度。
+- 本候选版未安装或操作手机，人工真机验收尚未进行。自动检查、APK 构建及交付状态以本次验证记录为准，不沿用旧版本的真机结论。
+
+### English
+
+- Add `schema:2` to ordinary chat's `mcp__phone__run`, with declared app scope, text selectors, waits, finding, `if`, bounded `repeat` and `yield`. Known steps run locally; decisions return progress, reasons and available screenshots to the original conversation, without creating a checkpoint chat for the sequence or requiring task-page recovery.
+- Allow screenshot-coordinate taps, input and gestures within a sequence. Each visual action returns to the original conversation for a fresh decision; changed pages invalidate old coordinates. Uncertain sends or submissions must not be replayed automatically. Node-free input returning `need-visual-paste` only prepares the clipboard and attempts to open the paste menu; inspect a new screenshot, paste and verify the draft before continuing.
+- Add an explicit send scope, `send:{app,recipient,text}`. After the app, recipient and full message are displayed and confirmed, searching, typing, pasting and sending can share approval across individual calls or `schema:2 run` segments within the same phone task. A changed scope or an ended task requires approval again; rejection retains no grant. Known payment, deletion and other sensitive actions cannot borrow this approval. Calls without a scope retain existing rules, including individual confirmation for node-free coordinate input.
+- Ask for visual permission per app, optionally together with send approval. “This step only” does not save visual access; “This app, this task” remembers visual access until revoked in the phone-control app list. Visual access is independent of send approval, so allowing only one visual step may prompt again for subsequent visual actions.
+- Keep the automation page and `schema:1` saved-task entry available alongside ordinary chat sequences. Its global automatic switch does not broaden ordinary chat permissions. Protect saved-task checkpoints against stale consumers affecting newer progress.
+- This candidate has not been installed or used to control a phone; manual device acceptance remains pending. Consult this delivery's verification record for automated checks, APK build and delivery status. Earlier device results do not validate this candidate.
+
 ## 1.0.18 · 2026-11-12
 
 ### 中文

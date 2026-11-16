@@ -1,7 +1,11 @@
 package io.github.ccch1mneyyy.dsh_app.phone
 
 /** A bounded, single-app plan. Validation finishes before the first device operation. */
-data class RoutinePlan(val app: String, val steps: List<Step>, val startAt: Int, val dryRun: Boolean) {
+data class RoutinePlan(
+    val app: String, val steps: List<Step>, val startAt: Int, val dryRun: Boolean,
+    val schema: Int = 1, val apps: Set<String> = setOf(app), val forbiddenTargets: List<String> = emptyList(),
+    val send: SendScope? = null,
+) {
     data class Step(val op: String, val args: Map<String, Any?>) {
         fun a() = Args(args)
         // Input contents never enter the confirmation, trace, or action log.
@@ -18,6 +22,11 @@ data class RoutinePlan(val app: String, val steps: List<Step>, val startAt: Int,
         val OPS = listOf("tap", "type", "scroll", "wait", "assert", "snapshot", "key")
 
         fun parse(a: Args): Either<String, RoutinePlan> {
+            if ("schema" in a.keys()) {
+                if (a.number("schema")?.toDouble() != 2.0) return Either.Left("unsupported-run-schema")
+                return parseChat(a)
+            }
+            if ("send" in a.keys()) return Either.Left("send-requires-run-schema-2")
             val app = a.str("app") ?: return Either.Left("run 需要 app（当前应用的完整包名）。")
             if (!Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+").matches(app)) return Either.Left("app 必须是完整包名。")
             val raw = a.list("steps") ?: return Either.Left("run 需要 steps 数组。")
@@ -69,6 +78,95 @@ data class RoutinePlan(val app: String, val steps: List<Step>, val startAt: Int,
             }
             if (start > 1 && steps[start - 1].a().str("requireText") == null) return Either.Left("恢复步骤必须带 requireText，先观察页面再续跑，不能盲目重放。")
             return Either.Right(RoutinePlan(app, steps, start, a.bool("dryRun") == true))
+        }
+
+        private fun parseChat(a: Args): Either<String, RoutinePlan> = try {
+            require(a.keys().all { it in CHAT_FIELDS }) { "unknown-fields:" + (a.keys() - CHAT_FIELDS).joinToString(",") }
+            require(!a.has("startAt") || a.int("startAt") == 1) { "run-v2-needs-fresh-steps" }
+            require(!a.has("dryRun") || a.bool("dryRun") != null) { "invalid-dry-run" }
+            require(!a.has("apps") || a.list("apps") != null) { "invalid-apps" }
+            require(!a.has("forbiddenTargets") || a.list("forbiddenTargets") != null) { "invalid-forbidden-targets" }
+            val apps = a.list("apps") ?: listOfNotNull(a.str("app"))
+            val send = SendScope.parse(a)
+            require(send == null || send.app in apps) { "send-scope-app-out-of-scope" }
+            val raw = a.list("steps") ?: error("missing-steps")
+            require(Json.write(raw).length <= 64_000) { "run-too-large" }
+            val steps = AutomationPlan.list(Json.parse(Json.write(raw)))
+            var nodes = 0
+            fun convert(items: List<Map<String, Any?>>, depth: Int, inLoop: Boolean = false): List<Map<String, Any?>> {
+                require(depth <= 4 && items.isNotEmpty()) { "steps-depth-or-empty" }
+                return items.map { source ->
+                    require(++nodes <= MAX_STEPS) { "steps-limit" }
+                    val op = source["op"] as? String ?: error("missing-op")
+                    require(op in CHAT_OPS) { "unsupported-op:$op" }
+                    require(op != "break" || inLoop) { "break-outside-loop" }
+                    if (op == "scroll") require(source["until"] == null || source["until"] is String) { "scroll-until-needs-text" }
+                    if (op == "repeat") require(source["until"] == null || source["until"] is Map<*, *>) { "repeat-until-needs-condition" }
+                    source["selector"]?.let { validateSelector(AutomationPlan.obj(it)) }
+                    when (op) {
+                        "yield" -> {
+                            AutomationPlan.known(source, setOf("op"))
+                            mapOf("op" to "snapshot", "_chatOp" to "yield")
+                        }
+                        "gesture" -> {
+                            AutomationPlan.known(source, setOf("op", "observation", "steps", "gap", "note"))
+                            AutomationPlan.string(source, "observation")
+                            val strokes = source["steps"] as? List<*> ?: error("missing-gesture-steps")
+                            val gap = source["gap"]?.let { AutomationPlan.bounded(source, "gap", 0, 5000, null).toLong() }
+                            require(GesturePlan.plan(strokes, gap) is GesturePlan.Outcome.Ok) { "invalid-gesture" }
+                            source + mapOf("op" to "snapshot", "_chatOp" to "gesture")
+                        }
+                        "find" -> source + mapOf("op" to "read_text", "name" to (source["name"] ?: "found"))
+                        "if" -> source + mapOf("then" to convert(AutomationPlan.list(source["then"]), depth + 1, inLoop)) +
+                            (source["else"]?.let {
+                                val branch = AutomationPlan.list(it)
+                                mapOf("else" to if (branch.isEmpty()) emptyList<Map<String, Any?>>() else convert(branch, depth + 1, inLoop))
+                            } ?: emptyMap())
+                        "repeat" -> source + mapOf("steps" to convert(AutomationPlan.list(source["steps"]), depth + 1, true))
+                        else -> source
+                    }
+                }
+            }
+            val forbidden = a.list("forbiddenTargets") ?: emptyList<Any?>()
+            fun stripInternal(items: List<Map<String, Any?>>): List<Map<String, Any?>> = items.map { source ->
+                when (source["_chatOp"]) {
+                    "yield", "gesture" -> mapOf("op" to "snapshot")
+                    else -> {
+                        val clean = source.filterKeys { it != "_chatOp" }.toMutableMap()
+                        if (source["op"] == "if") {
+                            clean["then"] = stripInternal(AutomationPlan.list(source["then"]))
+                            source["else"]?.let { clean["else"] = stripInternal(AutomationPlan.list(it)) }
+                        } else if (source["op"] == "repeat") {
+                            clean["steps"] = stripInternal(AutomationPlan.list(source["steps"]))
+                        }
+                        clean
+                    }
+                }
+            }
+            val normalized = convert(steps, 1)
+            val checked = AutomationPlan.parse(mapOf(
+                "schema" to 1, "id" to "chat-run", "name" to "Chat execution", "apps" to apps,
+                "steps" to stripInternal(normalized), "forbiddenTargets" to forbidden,
+                "limits" to mapOf("timeoutMs" to BUDGET_MS, "maxActions" to 500, "maxAiCalls" to 0),
+            ))
+            require(steps.isNotEmpty()) { "missing-steps" }
+            Either.Right(RoutinePlan(checked.apps.first(), normalized.map { Step(it["op"] as String, it) }, 1,
+                a.bool("dryRun") == true, 2, checked.apps, forbidden.filterIsInstance<String>(), send))
+        } catch (e: IllegalArgumentException) { Either.Left(e.message ?: "invalid-run") }
+          catch (e: IllegalStateException) { Either.Left(e.message ?: "invalid-run") }
+
+        val CHAT_OPS = setOf("open", "tap", "type", "scroll", "wait", "assert", "snapshot", "observe", "key",
+            "if", "repeat", "break", "set", "find", "read_text", "yield", "tap_xy", "input", "gesture")
+        private val CHAT_FIELDS = setOf("schema", "app", "apps", "steps", "startAt", "dryRun", "forbiddenTargets", "send")
+
+        private fun validateSelector(selector: Map<String, Any?>) {
+            val textFields = setOf("text", "viewId", "description", "role", "parentText")
+            AutomationPlan.known(selector, textFields + setOf("match", "enabled", "visible", "unique"))
+            require(textFields.any { selector[it] is String && (selector[it] as String).isNotBlank() }) { "invalid-selector" }
+            for (key in textFields) if (selector.containsKey(key)) AutomationPlan.string(selector, key)
+            for (key in listOf("enabled", "visible", "unique")) require(!selector.containsKey(key) || selector[key] is Boolean) { "invalid-selector" }
+            require(selector["visible"] != false && selector["unique"] != false) { "invalid-selector" }
+            require(selector["match"] == null || selector["match"] in setOf("contains", "exact", "normalized")) { "invalid-match" }
         }
     }
 }

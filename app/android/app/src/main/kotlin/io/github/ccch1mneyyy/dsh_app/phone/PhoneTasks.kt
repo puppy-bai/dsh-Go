@@ -52,6 +52,7 @@ class PhoneTasks(
     private var stoppedUntil = 0L
     private var stopReason: String? = null
     private val approved = LinkedHashSet<String>()
+    private var sendApproval: Pair<Long, String>? = null
     private var waived = false
     private val notified = HashSet<String>()
     private var app: String? = null
@@ -222,16 +223,17 @@ class PhoneTasks(
 
     /** Engine/plugin shutdown also invalidates a prompt that predates any native task. */
     fun invalidateOwners() {
-        synchronized(lock) { lifecycle++ }
+        synchronized(lock) { lifecycle++; sendApproval = null }
         fire()
     }
 
     /** Applying a late waiver and checking its owner are one operation. */
-    fun confirmIfCurrent(owner: Owner, pkg: String? = null, waiveTask: Boolean = false): Boolean {
+    fun confirmIfCurrent(owner: Owner, pkg: String? = null, waiveTask: Boolean = false, send: SendScope? = null): Boolean {
         var changed = false
         synchronized(lock) {
             if (!owner.active || !currentLocked(owner)) return false
             if (pkg != null) approved += pkg
+            if (send != null) sendApproval = lifecycle to send.fingerprint
             if (waiveTask && !waived) { waived = true; changed = true }
         }
         if (changed) fire()
@@ -268,6 +270,7 @@ class PhoneTasks(
     fun clearStop() {
         synchronized(lock) {
             lifecycle++
+            sendApproval = null
             stoppedUntil = 0L
             stopReason = null
         }
@@ -313,6 +316,10 @@ class PhoneTasks(
     fun isStopped(): Boolean = synchronized(lock) { clock() < stoppedUntil }
 
     fun isApproved(pkg: String): Boolean = synchronized(lock) { pkg in approved }
+
+    fun isSendApproved(send: SendScope): Boolean = synchronized(lock) {
+        active && !idleLocked(clock()) && clock() >= stoppedUntil && sendApproval == (lifecycle to send.fingerprint)
+    }
 
     fun approve(pkg: String) = synchronized(lock) {
         approved += pkg
@@ -380,6 +387,7 @@ class PhoneTasks(
         lifecycle++
         active = false
         approved.clear()
+        sendApproval = null
         waived = false
         notified.clear()
         interjections.clear()

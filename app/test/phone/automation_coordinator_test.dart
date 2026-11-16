@@ -14,6 +14,7 @@ class _Client extends DshClient {
   final cancelled = <String>[];
   Completer<SessionCreated>? pendingCreate;
   bool failPrompt = false;
+  void Function()? beforePromptFailure;
 
   @override
   Future<SessionCreated> createSession({
@@ -34,7 +35,10 @@ class _Client extends DshClient {
     String? timeZone,
   }) async {
     prompts.add(requestId!);
-    if (failPrompt) throw StateError('uncertain network acknowledgement');
+    if (failPrompt) {
+      beforePromptFailure?.call();
+      throw StateError('uncertain network acknowledgement');
+    }
     return requestId;
   }
 
@@ -60,10 +64,17 @@ void main() {
 
   setUp(() {
     calls = [];
-    run = {'runId': 'run-1', 'state': 'running', 'isActive': true};
+    run = {'runId': 'run-1', 'state': 'running', 'isActive': true, 'dispatchEpoch': 1};
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
-      if (call.method == 'automationPause') run = {...run, 'state': 'paused'};
+      if (call.method == 'automationPause') {
+        final args = call.arguments as Map;
+        if (args['runId'] != run['runId'] || args['checkpoint'] != run['checkpoint'] ||
+            args['dispatchEpoch'] != run['dispatchEpoch'] || run['state'] != 'awaiting_ai') {
+          return {'ok': false, 'reason': 'stale-checkpoint'};
+        }
+        run = {...run, 'state': 'paused', 'reason': 'checkpoint-dispatch-failed'};
+      }
       return {'ok': true, 'run': run};
     });
   });
@@ -117,8 +128,31 @@ void main() {
     expect(client.prompts, ['automation-run-1-cp-1']);
     expect(calls.where((c) => c.method == 'automationPause'), hasLength(1));
     expect(run['state'], 'paused');
+    expect(run['reason'], 'checkpoint-dispatch-failed');
+    expect((calls.firstWhere((c) => c.method == 'automationPause').arguments as Map)['checkpoint'], 'cp-1');
     container.dispose();
     await tester.pump();
+  });
+
+  testWidgets('a late dispatch failure cannot pause a newer checkpoint', (tester) async {
+    final client = _Client()..failPrompt = true;
+    run = {...run, 'state': 'awaiting_ai', 'checkpoint': 'cp-1'};
+    client.beforePromptFailure = () {
+      run = {...run, 'checkpoint': 'cp-2', 'dispatchEpoch': 2};
+    };
+    final container = await attach(client);
+    await tester.pump();
+    expect(run['state'], 'awaiting_ai');
+    expect(run['checkpoint'], 'cp-2');
+    expect(calls.where((c) => c.method == 'automationPause'), hasLength(1));
+    container.dispose();
+    await tester.pump();
+  });
+
+  test('stale checkpoint guidance never asks to pause its successor', () {
+    final prompt = automationCheckpointPrompt({'runId': 'r', 'checkpoint': 'old'});
+    expect(prompt, contains('不调用 pause/stop'));
+    expect(prompt, isNot(contains('无法确定下一步或当前令牌失效，调用 task pause')));
   });
 
   testWidgets('disposed coordinator cancels a late-created session without prompting', (tester) async {

@@ -1,0 +1,15 @@
+{
+  "schema": 2,
+  "apps": ["example.phone.lab"],
+  "send": {
+    "app": "example.phone.lab",
+    "recipient": "测试联系人",
+    "text": "你好，这是测试消息。"
+  },
+  "dryRun": true,
+  "steps": [
+    {"op": "type", "target": "消息输入框", "text": "你好，这是测试消息。"},
+    {"op": "tap", "target": "发送"},
+    {"op": "yield"}
+  ]
+}

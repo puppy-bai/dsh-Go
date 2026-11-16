@@ -9913,6 +9913,12 @@ class L10nEn extends L10n {
   String get petActionVoiceStart => 'Record';
 
   @override
+  String get phoneVisualGrantsTitle => 'Screenshot control permissions';
+
+  @override
+  String get phoneVisualGrantRevoke => 'Tap to revoke screenshot-based tapping and input';
+
+  @override
   String get phoneDiagnosticsCollecting => 'Collecting…';
 
   @override
