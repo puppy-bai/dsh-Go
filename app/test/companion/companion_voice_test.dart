@@ -146,6 +146,18 @@ void main() {
   });
 
   group('voice page', () {
+    Future<void> waitForSettings(WidgetTester tester) async {
+      final ready = find.text('常用服务');
+      final elapsed = Stopwatch()..start();
+      // Preferences and secure-storage loading can finish outside the frame scheduler.
+      while (ready.evaluate().isEmpty && elapsed.elapsed < const Duration(seconds: 5)) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+        await tester.pump();
+      }
+      expect(ready, findsOneWidget);
+      await tester.pumpAndSettle();
+    }
+
     testWidgets('MiMo from the presets: a key and a voice are all it takes', (tester) async {
       // A phone-tall screen: the whole form fits, nothing hides under the bar.
       tester.view.physicalSize = const Size(1080, 3600);
@@ -201,8 +213,7 @@ void main() {
           ),
         ),
       );
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pumpAndSettle();
+      await waitForSettings(tester);
 
       await tester.tap(find.text('常用服务'));
       await tester.pumpAndSettle();
@@ -284,8 +295,7 @@ void main() {
           ),
         ),
       );
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pumpAndSettle();
+      await waitForSettings(tester);
 
       await tester.tap(find.text('常用服务'));
       await tester.pumpAndSettle();
@@ -360,8 +370,7 @@ void main() {
           ),
         ),
       );
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pumpAndSettle();
+      await waitForSettings(tester);
 
       await tester.tap(find.text('OpenAI 兼容接口'));
       await tester.pumpAndSettle();
