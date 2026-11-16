@@ -125,8 +125,12 @@ jobs:
         run: |
           tooling/build-apk.sh --build-name '${{ steps.version.outputs.version }}' -- --dart-define=DSH_UPDATE_MIRROR=
           signer="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)"
-          "$signer" verify --print-certs app/build/app/outputs/flutter-apk/app-arm64-release.apk > "$RUNNER_TEMP/apk-signature.txt"
-          fingerprint="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/apk-signature.txt" | tr -d ' :' | tr '[:upper:]' '[:lower:]')"
+          if ! "$signer" verify --print-certs app/build/app/outputs/flutter-apk/app-arm64-release.apk > "$RUNNER_TEMP/apk-signature.txt" 2>&1; then
+            cat "$RUNNER_TEMP/apk-signature.txt"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/apk-signature.txt"
+          fingerprint="$(sed -n 's/.*certificate SHA-256 digest:[[:space:]]*//p' "$RUNNER_TEMP/apk-signature.txt" | tr -d ' :' | tr '[:upper:]' '[:lower:]')"
           echo "APK signer SHA-256: ${fingerprint:-missing}"
           test "$fingerprint" = 48175d4029e9d47c4b008f15f706cb4deca1b88f80095b14d2b21a3d4ed02d35 || {
             echo 'APK signer does not match the certificate required for in-place upgrades.' >&2
