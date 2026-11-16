@@ -62,6 +62,8 @@ NPM_REGISTRY="https://registry.npmmirror.com"
 TERMUX_REPO="https://packages.termux.dev/apt/termux-main"
 UBUNTU_ARCHIVE_AMD64="https://mirrors.tuna.tsinghua.edu.cn/ubuntu"        # InRelease verified with gpgv
 UBUNTU_ARCHIVE_ARM64="https://mirrors.tuna.tsinghua.edu.cn/ubuntu-ports"
+# Preserve locked packages after the live archive removes superseded versions.
+UBUNTU_SNAPSHOT="https://snapshot.ubuntu.com/ubuntu/20261101T000000Z"
 PBS_OFFICIAL="https://github.com/astral-sh/python-build-standalone/releases/download"
 PBS_MIRROR="https://registry.npmmirror.com/-/binary/python-build-standalone"
 
@@ -99,7 +101,7 @@ fetch() {
   if [[ -f "$dest" && -n "$want" && "$(sha256 "$dest")" == "$want" ]]; then return 0; fi
   if [[ -f "$dest" && -z "$want" ]]; then return 0; fi
   log "download $url"
-  curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 -sS -o "$dest.part" "$url"
+  curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 -sS -o "$dest.part" "$url" || return
   mv "$dest.part" "$dest"
   if [[ -n "$want" ]]; then
     local got; got="$(sha256 "$dest")"
@@ -192,7 +194,8 @@ PYEOF
   local name file sum
   while read -r file sum; do
     name="$(basename "$file")"
-    fetch "$mirror/$file" "$CACHE/ubuntu/debs/$name" "$sum"
+    fetch "$mirror/$file" "$CACHE/ubuntu/debs/$name" "$sum" \
+      || fetch "$UBUNTU_SNAPSHOT/$file" "$CACHE/ubuntu/debs/$name" "$sum"
     printf '%s\n' "$CACHE/ubuntu/debs/$name"
   done < <(python3 -I -c 'import json,sys; [print(p["filename"], p["sha256"]) for p in json.load(open(sys.argv[1]))["packages"]]' "$lock")
 }
