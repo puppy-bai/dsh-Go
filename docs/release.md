@@ -58,6 +58,12 @@ App 以 APK 分发、不上商店，更新靠 App 自己查 GitHub Releases、�
 
 ## 构建号
 
+### 未变化的手机运行时
+
+Release 工作流会先取上一正式版的 arm64 APK，并验证 GitHub `SHA256SUMS`、固定签名证书、运行时 manifest、rootfs 和每个运行时原生库的 SHA-256。只有当前提交与上一正式版标签的运行时源码输入完全相同（`runtime/build-runtime.sh`、`runtime/lib/rtbuild.py`、锁文件、固定输入、补丁、桥接和启动目录），才从已发布 APK 提取运行时；任一校验失败或运行时源码发生变化，就从源码重新构建。提取器不会复用 APK 的 Flutter/Dart 内容，也不会接受缺少 manifest 或哈希不匹配的包。
+
+这条路径只用于减少稳定运行时重复构建，不改变运行时版本或 APK 的签名。运行时源码变化时仍会生成新的运行时版本；构建日志会明确记录复用或从源码构建。
+
 所有 APK，不论开发包还是正式包，一律用 `tooling/build-apk.sh` 出：
 
 ```sh

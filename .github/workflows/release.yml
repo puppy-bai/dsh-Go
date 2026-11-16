@@ -73,6 +73,49 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+      - name: Check whether the prior release runtime can be reused
+        id: runtime
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          base_tag="$(gh release view --repo puppy-bai/dsh-Go --json tagName --jq .tagName)"
+          [[ "$base_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+          git fetch --no-tags origin "refs/tags/$base_tag:refs/tags/$base_tag"
+          if git diff --quiet "$base_tag" HEAD -- \
+            runtime/build-runtime.sh runtime/lib/rtbuild.py runtime/locks runtime/inputs \
+            runtime/patches runtime/bridge runtime/boot runtime/direct; then
+            echo "reuse=true" >> "$GITHUB_OUTPUT"
+            echo "base_tag=$base_tag" >> "$GITHUB_OUTPUT"
+          else
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+            echo "Runtime sources changed since $base_tag; rebuilding from source."
+          fi
+      - name: Download and verify prior release runtime
+        if: steps.version.outputs.publish == 'true' && steps.runtime.outputs.reuse == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          base_tag='${{ steps.runtime.outputs.base_tag }}'
+          asset="dsh-go-${base_tag#v}-arm64.apk"
+          mkdir -p "$RUNNER_TEMP/runtime-reuse"
+          gh release download "$base_tag" --repo puppy-bai/dsh-Go \
+            --pattern "$asset" --pattern SHA256SUMS --dir "$RUNNER_TEMP/runtime-reuse"
+          signer="$(find "$ANDROID_HOME/build-tools" -name apksigner | sort -V | tail -1)"
+          if ! "$signer" verify --print-certs "$RUNNER_TEMP/runtime-reuse/$asset" > "$RUNNER_TEMP/runtime-reuse/signature.txt" 2>&1; then
+            cat "$RUNNER_TEMP/runtime-reuse/signature.txt"
+            exit 1
+          fi
+          fingerprint="$(sed -n 's/.*certificate SHA-256 digest:[[:space:]]*//p' "$RUNNER_TEMP/runtime-reuse/signature.txt" | tr -d ' :' | tr '[:upper:]' '[:lower:]')"
+          test "$fingerprint" = 48175d4029e9d47c4b008f15f706cb4deca1b88f80095b14d2b21a3d4ed02d35 || {
+            echo 'Prior APK signer does not match the certificate required for in-place upgrades.' >&2
+            exit 1
+          }
+          python3 tooling/reuse_runtime_from_apk.py \
+            --apk "$RUNNER_TEMP/runtime-reuse/$asset" \
+            --sums "$RUNNER_TEMP/runtime-reuse/SHA256SUMS" \
+            --out runtime/out --abi arm64-v8a
+          echo "Reused verified arm64 runtime from $base_tag; Flutter/Dart APK contents will be rebuilt below."
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         if: steps.version.outputs.publish == 'true'
         with:
@@ -88,8 +131,8 @@ jobs:
         working-directory: app
         run: |
           flutter pub get --enforce-lockfile
-      - name: Build pinned Android runtime
-        if: steps.version.outputs.publish == 'true'
+      - name: Build pinned Android runtime from source
+        if: steps.version.outputs.publish == 'true' && steps.runtime.outputs.reuse != 'true'
         run: runtime/build-runtime.sh arm64-v8a
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         if: steps.version.outputs.publish == 'true'
