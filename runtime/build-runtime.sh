@@ -143,6 +143,11 @@ node_dist() {  # $1 = node arch (arm64|x64); echoes path
 termux_deb() {  # $1 = package, $2 = version, $3 = termux arch; echoes path
   local pkg="$1" ver="$2" arch="$3" name="$1_$2_$3.deb"
   local dest="$CACHE/termux/$name" pin; pin="$(pin_of "$name")"
+  local input="$HERE/inputs/termux/$name"
+  if [[ -f "$input" ]]; then
+    [[ -n "$pin" && "$(sha256 "$input")" == "$pin" ]] || die "sha256 mismatch for fixed input $input"
+    printf '%s' "$input"; return
+  fi
   if [[ -f "$dest" && -n "$pin" && "$(sha256 "$dest")" == "$pin" ]]; then printf '%s' "$dest"; return; fi
   # Resolve pool path + hash from the current Packages index (verifies index -> deb).
   local idx="$CACHE/termux/Packages-$arch"

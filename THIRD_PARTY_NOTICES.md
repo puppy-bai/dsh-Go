@@ -309,6 +309,8 @@ APK 内置的 Linux 运行时由 `runtime/build-runtime.sh` 构建，以下组�
 
 GPL / LGPL 组件的对应源码：proot、libtalloc、libandroid-shmem 的二进制取自 Termux 官方 apt 仓库（https://packages.termux.dev/apt/termux-main ），`runtime/build-runtime.sh` 固定了每个 .deb 的 SHA-256。源码分别在 https://github.com/termux/proot （tag `v5.1.107.98`，构建时一并下载并核对哈希）、https://www.samba.org/ftp/talloc/ （2.5.0）、https://github.com/termux/libandroid-shmem （0.7）；Termux 的构建配方在 https://github.com/termux/termux-packages 。本项目对这三个二进制的修改只有上面说的 DT_NEEDED / DT_SONAME 改名。
 
+Termux 移除旧版 PRoot 包后，两个架构的原始 5.1.107.98 `.deb` 从官方历史构建恢复并按原 SHA-256 核验，固定保存在 [`runtime/inputs/termux/`](runtime/inputs/termux/README.md)，随附原始 GPL-2.0 全文、构建提交及对应源码链接。After the live repository removed PRoot 5.1.107.98, its two original packages were recovered from an official Termux build and verified against the existing checksums. The fixed inputs include the original GPL-2.0 text, build provenance and corresponding source link; no dependency version was changed.
+
 ### npm 传递依赖与发行核验
 
 主包的 MIT 许可不覆盖所有传递依赖。当前默认 `runtime/locks/dsh-0.2.1-rc.4/package-lock.json` 还锁定了以下需要单独核验的组件：

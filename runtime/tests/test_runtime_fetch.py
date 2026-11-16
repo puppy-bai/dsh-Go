@@ -59,7 +59,7 @@ curl() {
 
 @unittest.skipUnless(BASH, 'bash is required to test the runtime recipe')
 class RuntimeFetch(unittest.TestCase):
-    def run_recipe(self, mode, command, cached=False):
+    def run_recipe(self, mode, command, cached=False, vendor=None, termux_cached=False):
         source = RECIPE.read_text(encoding='utf-8')
         source, count = re.subn(r'(?m)^main "\$@"\s*\Z', '', source)
         self.assertEqual(count, 1, 'Only strip the final build entrypoint')
@@ -75,6 +75,14 @@ class RuntimeFetch(unittest.TestCase):
             if cached:
                 destination.parent.mkdir(parents=True)
                 destination.write_bytes(PAYLOAD)
+            vendored = root / 'inputs/termux/fixture_1_aarch64.deb'
+            if vendor is not None:
+                vendored.parent.mkdir(parents=True)
+                vendored.write_bytes(vendor)
+            if termux_cached:
+                cache = root / 'cache/termux/fixture_1_aarch64.deb'
+                cache.parent.mkdir(parents=True)
+                cache.write_bytes(PAYLOAD)
             env = dict(os.environ, TEST_ROOT=str(root), TEST_PYTHON=sys.executable,
                        TEST_MODE=mode, TEST_SHA=SHA)
             result = subprocess.run([BASH, '--noprofile', '--norc', '-s'],
@@ -83,6 +91,8 @@ class RuntimeFetch(unittest.TestCase):
             requests = (root / 'requests').read_text().splitlines() if (root / 'requests').exists() else []
             contents = destination.read_bytes() if destination.exists() else None
             output_exists = (root / 'cache/output').exists()
+            if vendor is not None:
+                self.assertEqual(vendored.read_bytes(), vendor, 'Vendored inputs must never be modified')
             return result, requests, contents, output_exists
 
     def test_http_failure_propagates_even_in_an_or_context(self):
@@ -119,6 +129,38 @@ class RuntimeFetch(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(requests, [])
         self.assertEqual(contents, PAYLOAD)
+
+    def test_valid_vendored_termux_package_is_returned_without_network(self):
+        result, requests, _, _ = self.run_recipe('http', '''
+HERE="$TEST_ROOT"
+PIN[fixture_1_aarch64.deb]="$TEST_SHA"
+termux_deb fixture 1 aarch64
+''', vendor=PAYLOAD)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(requests, [])
+        self.assertTrue(result.stdout.strip().endswith('/inputs/termux/fixture_1_aarch64.deb'))
+
+    def test_corrupt_vendor_is_rejected_even_when_the_cache_is_valid(self):
+        result, requests, _, _ = self.run_recipe('http', '''
+HERE="$TEST_ROOT"
+PIN[fixture_1_aarch64.deb]="$TEST_SHA"
+termux_deb fixture 1 aarch64
+''', vendor=b'corrupt vendored input', termux_cached=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('sha256 mismatch', result.stderr)
+        self.assertEqual(requests, [])
+        self.assertEqual(result.stdout, '')
+
+    def test_shipped_proot_packages_match_the_unchanged_recipe_pins(self):
+        source = RECIPE.read_text(encoding='utf-8')
+        version = re.search(r'^PROOT_VERSION="([^"]+)"', source, re.M).group(1)
+        pins = dict(re.findall(r'^\s*\[([^\]]+)\]=([0-9a-f]{64})\s*$', source, re.M))
+        for arch in ('aarch64', 'x86_64'):
+            with self.subTest(arch=arch):
+                name = f'proot_{version}_{arch}.deb'
+                package = RECIPE.parent / 'inputs/termux' / name
+                self.assertTrue(package.is_file(), f'Missing vendored package: {name}')
+                self.assertEqual(hashlib.sha256(package.read_bytes()).hexdigest(), pins[name])
 
 
 if __name__ == '__main__':
