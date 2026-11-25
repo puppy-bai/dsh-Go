@@ -2,84 +2,20 @@
   <b>简体中文</b> · <a href="README.en.md">English</a>
 </p>
 
-> **1.0.19 候选版：聊天统一手机执行。** 普通聊天可用 `schema:2 run` 在本机执行确定步骤、`if` 和有限 `repeat`；`yield`、视觉动作完成或需要判断时，将进度与可用截图交回原会话，不为执行段创建检查点新聊天。同一发送指令可在首次展示应用、联系人和完整正文并确认后，跨操作段复用授权；变更范围或手机任务结束后重新确认。按应用确认的视觉权限可在应用名单撤销，普通手机操控授权仍独立生效；自动任务页入口继续保留。详见[手机操控指南](docs/guide/zh/04-phone-control.md)和[候选更新日志](docs/changelog.md)。人工真机验收尚未进行，构建及验证状态以交付记录为准。
+# DSH Go 社区版
 
-社区版安装包只从本仓库 Releases 下载；下文原作者官网提供的是上游版本。1.0.16～1.0.18 的内置更新器仍指向上游，请手动下载覆盖升级，不要卸载。后续新版本在 main 的 CI 通过后由 [Android Release](.github/workflows/release.yml) 自动打包发布；维护者更新 `app/pubspec.yaml` 和双语更新日志即可，签名与流程见 [发版说明](docs/release.md#github-自动发版)。
+这是基于 [ccch1mneyyy 的 DSH Go](https://github.com/ccch1mneyyy/dsh-go) 独立维护的社区 Fork。可以在 Android 手机上运行 DeepSeek Harness，也可以连接电脑或服务器上的引擎。
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-zh-dark.webp">
-    <img src="docs/assets/hero-zh-light.webp" alt="DSH Go：把 DeepSeek Harness 装进口袋" width="100%">
-  </picture>
-</p>
+## 社区版的改进
 
-<p align="center">
-  DeepSeek Harness 的 Android 客户端。手机上直接跑，也能遥控你电脑上的 DSH。
-</p>
+- **普通聊天里连续执行。** 1.0.19 可以在手机本地处理等待、按文字查找、条件分支和有限循环。需要 AI 判断时，进度和可用截图交回原会话。
+- **无障碍树缺少目标时用截图定位。** 依据当前截图和应用授权进行点按、手势和输入。页面变化后重新定位。
+- **同一条消息可以只确认一次。** 确认应用、联系人和完整正文后，同一手机任务的搜索、输入和发送可以共用授权。
+- **保存常用任务并一键启动。** 自动任务页可保存带参数的任务，便于反复执行。
 
-<blockquote>
-<p><b>本仓库是一个社区 Fork，基线为上游 <code>v1.0.13</code>。</b>手机操控增加了
-<code>gesture</code> 坐标手势、<code>input</code> 坐标输入和 <code>run</code> 多步任务，
-并支持按文字点击、等待和连续滚动。1.0.16 每步重新定位目标、核对前台应用，失败返回进度；
-任务技能、30 项场景分析和本地测试页见 <a href="examples/phone-routines/README.md">手机日常任务包</a>。
-上游不接受外部 PR，所以本仓库独立维护；
-详见<a href="#gesture">坐标手势</a>与 <a href="docs/gesture-zh.md">docs/gesture-zh.md</a>。
-主仓库 <a href="https://github.com/ccch1mneyyy/dsh-go">ccch1mneyyy/dsh-go</a>、原作者 <a href="https://github.com/ccch1mneyyy">ccch1mneyyy</a>。本项目及其改动按 AGPL-3.0 发布，改动部分同样开源。</p>
-<p><b>安装</b>：1.0.18 为 arm64 版，适用于 Android 8.0+；无障碍截图需要 Android 11+。
-同一签名的社区版可覆盖升级保留数据。Android 不允许跨签名覆盖；安装失败时不要卸载当前版本，以免清除对话、设置、插件及本机运行环境。</p>
-</blockquote>
+[下载 ARM64 安装包](https://github.com/puppy-bai/dsh-Go/releases/latest) · [手机操控指南](docs/guide/zh/04-phone-control.md) · [更新日志](docs/changelog.md) · [提交反馈](https://github.com/puppy-bai/dsh-Go/issues)
 
-<p align="center">
-  <a href="../../releases/latest"><img alt="Android 8+" src="https://img.shields.io/badge/Android-8%2B-4B67B4?style=flat-square&logo=android&logoColor=white&labelColor=2B3245"></a>
-  <a href="LICENSE"><img alt="许可证 AGPL-3.0" src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF%E8%AF%81-AGPL--3.0-4B67B4?style=flat-square&labelColor=2B3245"></a>
-  <a href="https://forum.dshtui.com"><img alt="论坛" src="https://img.shields.io/badge/%E8%AE%BA%E5%9D%9B-forum.dshtui.com-4B67B4?style=flat-square&labelColor=2B3245"></a>
-  <a href="https://qm.qq.com/q/OEy2RqZnqY"><img alt="QQ 群 1132118290" src="https://img.shields.io/badge/QQ%20%E7%BE%A4-1132118290-4B67B4?style=flat-square&logo=tencentqq&logoColor=white&labelColor=2B3245"></a>
-</p>
-
-<p align="center">
-  <a href="https://trendshift.io/repositories/319451"><img src="https://trendshift.io/api/badge/trendshift/repositories/319451/daily" alt="DSH Go：Trendshift 全语言日榜第一（2026-10-30）" width="250" height="55"></a><br>
-  <sub>Trendshift 全语言日榜 #1 · 2026-10-30</sub>
-</p>
-
-<br>
-
-<h3 align="center">Deepy 和鲸娘，陪你干活</h3>
-
-<p align="center">干活时敲代码，做完来个空翻，等你确认会举手。打开「App 外显示」，它们还会跟你到桌面。</p>
-
-<p align="center">
-  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-deepy-typing-zh-dark.gif"><img src="docs/assets/pet-deepy-typing-zh-light.gif" width="168" alt="Deepy 敲代码"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-deepy-happy-zh-dark.gif"><img src="docs/assets/pet-deepy-happy-zh-light.gif" width="168" alt="Deepy 完成"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-deepy-notification-zh-dark.gif"><img src="docs/assets/pet-deepy-notification-zh-light.gif" width="168" alt="Deepy 等你确认"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-deepy-sleeping-zh-dark.gif"><img src="docs/assets/pet-deepy-sleeping-zh-light.gif" width="168" alt="Deepy 睡觉"></picture>
-</p>
-
-<p align="center">
-  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-girl-typing-zh-dark.gif"><img src="docs/assets/pet-girl-typing-zh-light.gif" width="168" alt="鲸娘 敲代码"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-girl-happy-zh-dark.gif"><img src="docs/assets/pet-girl-happy-zh-light.gif" width="168" alt="鲸娘 完成"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-girl-notification-zh-dark.gif"><img src="docs/assets/pet-girl-notification-zh-light.gif" width="168" alt="鲸娘 等你确认"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-girl-sleeping-zh-dark.gif"><img src="docs/assets/pet-girl-sleeping-zh-light.gif" width="168" alt="鲸娘 睡觉"></picture>
-</p>
-
-<br>
-
-<a id="download"></a>
-<h3 align="center">下载 DSH Go</h3>
-
-<p align="center">从 GitHub Releases 或官网下载页获取最新版 APK，常见手机选 arm64 包。</p>
-
-<p align="center">
-  <a href="../../releases/latest"><img alt="从 GitHub Releases 下载" src="https://img.shields.io/badge/GitHub%20Releases-%E4%B8%8B%E8%BD%BD%20APK-4B67B4?style=for-the-badge&logo=github&logoColor=white&labelColor=2B3245"></a>&emsp;<a href="https://go.dshtui.com/download"><img alt="从官网下载页下载" src="https://img.shields.io/badge/go.dshtui.com-%E5%AE%98%E7%BD%91%E4%B8%8B%E8%BD%BD-4B67B4?style=for-the-badge&labelColor=2B3245"></a>
-</p>
-
-<p align="center">
-  <b>感谢大家对 DSH Go 的支持和喜爱，我将尽快适配 iOS 和鸿蒙！大家 Star 点得越多，我适配得越快哦 hhh</b>
-</p>
-
-<p align="center">
-  <a href="https://github.com/ccch1mneyyy/dsh-go/stargazers"><img alt="GitHub Star 数" src="https://img.shields.io/github/stars/ccch1mneyyy/dsh-go?style=flat-square&logo=github&label=Star&color=4B67B4&labelColor=2B3245"></a>
-</p>
-
-<p align="center">
-  <sub>第一次用可以先看<a href="docs/guide/README.md">使用指南</a>，遇到问题欢迎来<a href="#community">论坛和 QQ 群</a>。</sub><br>
-  <sub>手机上装过签名不同的早期测试包时不能直接覆盖安装，需要先卸载旧版；卸载会清空对话、Linux 环境和设置。</sub>
-</p>
-
-<br>
+社区版安装包在本仓库 Releases 下载。同签名安装包可覆盖更新并保留数据。若签名不匹配，请保留现有安装，以免丢失聊天、设置和插件。1.0.16～1.0.18 需手动下载安装包才能切换到社区版更新源。新版本由 [Android Release 工作流](.github/workflows/release.yml) 在 CI 通过后处理。
 
 <h3 align="center">本机运行，也能遥控电脑</h3>
 
@@ -202,7 +138,7 @@ DSH Go 提供聊天界面、本机运行环境和远程连接，是基于 [DeepS
 
 安装要求为 Android 8.0（API 26）及以上。Release 页面上的 **arm64** 安装包适用于常见的 64 位 Android 手机；x86_64 设备和模拟器用的 x64 包在发布说明末尾的「其他版本下载」里。仓库没有 32 位 ARM 构建。
 
-1. 从本仓库 [Releases](../../releases/latest) 下载 `arm64` 的 APK（本 Fork 只出 arm64），或从上游[官网下载页](https://go.dshtui.com/download)下载官方版，并按系统提示允许该安装来源。
+1. 从[社区版 Releases](https://github.com/puppy-bai/dsh-Go/releases/latest)下载 `arm64` 安装包，并按 Android 提示安装。
 2. 首次启动时，选择在本机安装运行环境，或连接远程主机。
 3. 为所选主机配置模型和所需凭据，再开始对话；部分远程渠道需要在主机侧配置。
 
@@ -294,12 +230,6 @@ DSH Go 提供聊天界面、本机运行环境和远程连接，是基于 [DeepS
 
 真机自测顺序建议：`screen` 带 `image` → `input` 写一个正常输入框 → `input` 带 `submit` → `tap` 带 `text` 点「登录」
 → `scroll` 带 `until` 找列表深处的条目。
-
-### 这个 Fork 的构建与签名差异
-
-- APK 由 `tooling/build-apk.sh --build-name 1.0.15 -f arm64` 产出；构建机是 Windows（工具链用 `toolchain/env-win.sh` 适配），
-  运行时包 `runtime/out/arm64-v8a/**` 取自上游官方 `v1.0.13` 的 arm64 安装包（该目录不入库，见 `.gitignore`）。
-- 仓库里没有 `app/android/key.properties`，所以 Release 里的 APK 是 **debug 签名**：装之前必须先卸载官方版，卸载会清掉应用数据。
 
 ## 数据与权限
 
@@ -414,48 +344,26 @@ DSH_BETA_TOKEN_FILE= bash tooling/build-apk.sh --dry-run -f all
 
 ## 参与贡献
 
-问题反馈和改进建议可提交到 [Issues](../../issues)；上游本身的问题也可以报给[上游 Issues](https://github.com/ccch1mneyyy/dsh-go/issues)。代码、文档和翻译贡献请先看 [CONTRIBUTING.md](CONTRIBUTING.md)。插件作者可以从[插件教程](docs/plugins/README.md)和 [SDK](sdk/plugin-kit/README.md)开始。
+请在[社区版 Issues](https://github.com/puppy-bai/dsh-Go/issues)提交问题和建议。代码和文档约定见 [CONTRIBUTING.md](CONTRIBUTING.md)。插件开发可参考[教程](docs/plugins/README.md)和 [SDK](sdk/plugin-kit/README.md)。
 
-安全问题请按 [SECURITY.md](SECURITY.md) 报告，避免在公开 Issue 中提交漏洞细节或凭据。
-
-<a id="community"></a>
-
-## 社区
-
-- **论坛**：[forum.dshtui.com](https://forum.dshtui.com)
-- **QQ 群**：`1132118290`（[点此加群](https://qm.qq.com/q/OEy2RqZnqY)）
-- **微信群**：扫下方二维码，过期请加 QQ 群
-<!-- Telegram：链接待定，拿到后加一行 -->
-
-<p align="center">
-  <a href="https://qm.qq.com/q/OEy2RqZnqY"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/qr-qq-zh-dark.webp"><img src="docs/assets/qr-qq-zh-light.webp" width="300" alt="QQ 群 DSH-Go！！，群号 1132118290"></picture></a>&emsp;&emsp;<picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/qr-wechat-zh-dark.webp"><img src="docs/assets/qr-wechat-zh-light.webp" width="300" alt="微信群 DSHGo 2群"></picture>
-</p>
-
-<p align="center">
-  <sub>QQ 群号 <code>1132118290</code>，电脑上可<a href="https://qm.qq.com/q/OEy2RqZnqY">直接点此加群</a>。微信群二维码每周更新，过期请加 QQ 群。</sub>
-</p>
-
-## 友情链接
-
-- **[DSH-TUI](https://dshtui.com/)**：同一作者的作品，面向 DeepSeek Harness 的交互式终端界面。手机上用 DSH Go，电脑上就用它——像素鲸鱼、实时状态、时间回溯，装上即开工（[GitHub](https://github.com/ccch1mneyyy/dsh-TUI)）。
+安全问题请按 [SECURITY.md](SECURITY.md) 报告。
 
 ## 授权范围与再发布
 
 代码以 [AGPL-3.0](LICENSE) 开源，欢迎 fork 学习、自用和二次开发。请尊重原作者和项目来源：
 
-- **改造前请提前联系作者**：如需基于本项目进行改造、二次开发或衍生产品发布，请先通过 [Issues](https://github.com/ccch1mneyyy/dsh-go/issues) 或[社区](#community)联系原作者 ccch1mneyyy，说明用途与计划。
-- **fork 请标注主仓库与作者**：基于本仓库改造并发布时，请在仓库说明、应用「关于」页和发布页面清楚标注主仓库 <https://github.com/ccch1mneyyy/dsh-go> 与原作者 [ccch1mneyyy](https://github.com/ccch1mneyyy)，并按适用许可证保留版权、许可及修改声明。
+- 请保留页首所列的原作者 ccch1mneyyy 和上游仓库来源，并按适用许可证保留版权、许可和修改声明。
 - **禁止未授权商业化套皮**：不得未经授权将本项目的品牌标识、Deepy、鲸娘等受保护素材用于套皮售卖、收费分发或其他商业产品；不得违反适用许可证，删除应保留的版权与许可声明、闭源分发衍生代码，或冒充原作者、官方版本。
 - **名称与素材另有限制**：DSH Go 的名称、标识，以及 Deepy、鲸娘形象不在 AGPL 授权范围内，以修改版身份发布时请换成自己的名称和素材，见 [ASSETS.md](ASSETS.md)。
 
-**许可说明**：AGPL-3.0 允许符合其条款的修改、再发布和商业使用；上述提前联系及署名位置是作者的协作请求，不是对代码许可证追加的限制。品牌与素材须遵守各自的授权条件；本说明不改变 `sdk/`、`examples/` 及第三方内容的许可。
+**许可说明**：AGPL-3.0 允许符合其条款的修改、再发布和商业使用。品牌与素材须遵守各自的授权条件；本说明不改变 `sdk/`、`examples/` 及第三方内容的许可。
 
 ## 许可证与致谢
 
 本项目采用 [AGPL-3.0](LICENSE)；`sdk/` 和 `examples/` 保持 **MIT**。第三方代码和素材以各自声明为准。
 
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)：DSH Go 运行和连接的就是它。
-- [DSH-TUI](https://github.com/ccch1mneyyy/dsh-TUI)：吉祥物 Deepy 小鲸鱼和鲸娘来自这里。
+- DSH-TUI 是 Deepy 与鲸娘素材的来源。
 
 Phase 相关代码经作者许可使用。DeepSeek Harness、PiPilot、DS Bot、DSH Remote 及其他第三方组件、素材保留各自的许可证和署名。具体来源和条款见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 

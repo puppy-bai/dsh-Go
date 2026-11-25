@@ -2,86 +2,20 @@
   <a href="README.md">简体中文</a> · <b>English</b>
 </p>
 
-> **1.0.19 candidate: unified phone execution in chat.** Ordinary chats can use `schema:2 run` for local steps, `if` and bounded `repeat`. `yield`, a completed visual action or a need for judgment returns progress and available screenshots to the original conversation, without creating a checkpoint chat for the sequence. A send can share one approval across segments after the app, recipient and full message are displayed and confirmed; a changed scope or a finished phone task requires approval again. Per-app visual permission can be revoked in the app list; ordinary phone-control authorization still applies independently. The saved automation task page remains available. See the [phone-control guide](docs/guide/en/04-phone-control.md) and [candidate changelog](docs/changelog.md). Manual device acceptance has not been performed; consult the delivery record for build and validation status.
+# DSH Go Community Fork
 
-Download community builds only from this repository's Releases; the original author's website below distributes upstream builds. The updater in 1.0.16–1.0.18 still points upstream: download and install updates manually without uninstalling. Future versions are built and published by [Android Release](.github/workflows/release.yml) after main's CI passes. Maintainers update `app/pubspec.yaml` and the bilingual changelog; see the [release process](docs/release.md#github-自动发版) for signing and workflow details.
+An independently maintained Android client for DeepSeek Harness, based on [DSH Go by ccch1mneyyy](https://github.com/ccch1mneyyy/dsh-go). Run the engine on your phone or connect to one on a computer or server.
 
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/hero-en-dark.webp">
-    <img src="docs/assets/hero-en-light.webp" alt="DSH Go: DeepSeek Harness, in your pocket" width="100%">
-  </picture>
-</p>
+## What the community fork adds
 
-<p align="center">
-  An Android client for DeepSeek Harness. Run DSH right on your phone, or drive the one on your computer.
-</p>
+- **Run a sequence from ordinary chat.** Version 1.0.19 runs waits, text matching, conditions and bounded loops on the device. When a decision needs AI, progress and available screenshots return to the original chat.
+- **Use screenshots when the accessibility tree lacks a target.** Visual taps, gestures and text entry use a fresh screenshot and the configured permissions.
+- **Approve one message across multiple steps.** After you confirm the app, recipient and full message, the same phone task can reuse that approval when searching, typing and sending.
+- **Save and launch reusable tasks.** The automation page remains available for tasks with parameters that you run repeatedly.
 
-> **This repository is a community fork, based on upstream `v1.0.13`.** It adds `gesture` for
-> coordinate gestures, `input` for coordinate input, and `run` for bounded multi-step routines,
-> plus text targeting, waiting, and scrolling until a target appears. Version 1.0.16 resolves
-> targets on fresh observations, checks the foreground app, and returns progress on failure.
-> See [Phone routines](examples/phone-routines/README.md) for a task skill, 30 scenarios, and a local test page.
-> Upstream does not accept outside PRs, so this
-> fork is maintained separately; see [Coordinate gestures](#gesture) and
-> [docs/gesture-en.md](docs/gesture-en.md). Everything here, including the changes, is released
-> under AGPL-3.0. Upstream is [ccch1mneyyy/dsh-go](https://github.com/ccch1mneyyy/dsh-go), by
-> [ccch1mneyyy](https://github.com/ccch1mneyyy).
->
-> **Install:** Version 1.0.18 is arm64 for Android 8.0+ (accessibility screenshots require Android 11+).
-> A community build signed with the same key can be upgraded in place. Android cannot replace an app with a differently signed APK. If installation fails, do not uninstall the current app; that clears chats, settings, plugins and the local runtime.
+[Download the ARM64 APK](https://github.com/puppy-bai/dsh-Go/releases/latest) · [Phone-control guide](docs/guide/en/04-phone-control.md) · [Changelog](docs/changelog.md) · [Report an issue](https://github.com/puppy-bai/dsh-Go/issues)
 
-<p align="center">
-  <a href="../../releases/latest"><img alt="Android 8+" src="https://img.shields.io/badge/Android-8%2B-4B67B4?style=flat-square&logo=android&logoColor=white&labelColor=2B3245"></a>
-  <a href="LICENSE"><img alt="License AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-4B67B4?style=flat-square&labelColor=2B3245"></a>
-  <a href="https://forum.dshtui.com"><img alt="Forum" src="https://img.shields.io/badge/forum-forum.dshtui.com-4B67B4?style=flat-square&labelColor=2B3245"></a>
-  <a href="https://qm.qq.com/q/OEy2RqZnqY"><img alt="QQ group 1132118290" src="https://img.shields.io/badge/QQ%20group-1132118290-4B67B4?style=flat-square&logo=tencentqq&logoColor=white&labelColor=2B3245"></a>
-</p>
-
-<p align="center">
-  <a href="https://trendshift.io/repositories/319451"><img src="https://trendshift.io/api/badge/trendshift/repositories/319451/daily" alt="DSH Go: #1 on Trendshift's all-language daily ranking (2026-10-30)" width="250" height="55"></a><br>
-  <sub>#1 on Trendshift's all-language daily ranking · 2026-10-30</sub>
-</p>
-
-<br>
-
-<h3 align="center">Deepy and Whale girl keep you company</h3>
-
-<p align="center">They code, flip, wave and nap along with DSH, and can follow you to the home screen.</p>
-
-<p align="center">
-  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-deepy-typing-en-dark.gif"><img src="docs/assets/pet-deepy-typing-en-light.gif" width="168" alt="Deepy coding"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-deepy-happy-en-dark.gif"><img src="docs/assets/pet-deepy-happy-en-light.gif" width="168" alt="Deepy done"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-deepy-notification-en-dark.gif"><img src="docs/assets/pet-deepy-notification-en-light.gif" width="168" alt="Deepy needs you"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-deepy-sleeping-en-dark.gif"><img src="docs/assets/pet-deepy-sleeping-en-light.gif" width="168" alt="Deepy asleep"></picture>
-</p>
-
-<p align="center">
-  <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-girl-typing-en-dark.gif"><img src="docs/assets/pet-girl-typing-en-light.gif" width="168" alt="Whale girl coding"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-girl-happy-en-dark.gif"><img src="docs/assets/pet-girl-happy-en-light.gif" width="168" alt="Whale girl done"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-girl-notification-en-dark.gif"><img src="docs/assets/pet-girl-notification-en-light.gif" width="168" alt="Whale girl needs you"></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/pet-girl-sleeping-en-dark.gif"><img src="docs/assets/pet-girl-sleeping-en-light.gif" width="168" alt="Whale girl asleep"></picture>
-</p>
-
-<br>
-
-<a id="download"></a>
-<h3 align="center">Download DSH Go</h3>
-
-<p align="center">Get the latest APK from GitHub Releases or the download page at go.dshtui.com. Most phones need the arm64 package.</p>
-
-<p align="center">
-  <a href="../../releases/latest"><img alt="Download from GitHub Releases" src="https://img.shields.io/badge/GitHub%20Releases-Download%20APK-4B67B4?style=for-the-badge&logo=github&logoColor=white&labelColor=2B3245"></a>&emsp;<a href="https://go.dshtui.com/download"><img alt="Download from go.dshtui.com" src="https://img.shields.io/badge/go.dshtui.com-Download%20page-4B67B4?style=for-the-badge&labelColor=2B3245"></a>
-</p>
-
-<p align="center">
-  <b>Thank you all for supporting and loving DSH Go! iOS and HarmonyOS versions are coming as soon as I can make them. The more stars, the faster they come, hehe</b>
-</p>
-
-<p align="center">
-  <a href="https://github.com/ccch1mneyyy/dsh-go/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/ccch1mneyyy/dsh-go?style=flat-square&logo=github&label=Star&color=4B67B4&labelColor=2B3245"></a>
-</p>
-
-<p align="center">
-  <sub>New here? Start with the <a href="docs/guide/README.md">user guide</a>, and bring questions to the <a href="#community">forum and QQ group</a>.</sub><br>
-  <sub>An early test build signed with a different key can't be updated in place: uninstall it first, which clears your chats, the Linux environment and settings.</sub>
-</p>
-
-<br>
+Community builds are available in this repository's Releases. An update with the same signing key preserves app data. If signing differs, keep the existing installation to retain chats, settings and plugins. Versions 1.0.16–1.0.18 require a manual download to move to the community update channel. The [Android Release workflow](.github/workflows/release.yml) handles new versions after CI passes.
 
 <h3 align="center">Runs on your phone. Drives your computer.</h3>
 
@@ -204,7 +138,7 @@ Capabilities depend on the host and connection. DSHarness Remote currently accep
 
 Installation requires Android 8.0 (API 26) or later. The **arm64** package on the Releases page is for typical 64-bit Android phones; the x64 package for x86_64 devices and emulators is under “Other builds” at the end of the release notes. This repository has no 32-bit ARM build.
 
-1. Download the `arm64` APK from this repository's [Releases](../../releases/latest) (this fork only ships arm64), or get the official build from the upstream [download page](https://go.dshtui.com/download), and follow Android's prompt to allow that installation source.
+1. Download the `arm64` APK from [community Releases](https://github.com/puppy-bai/dsh-Go/releases/latest) and follow the Android installation prompts.
 2. On first launch, choose an on-device runtime or a remote host.
 3. Configure a model and its credentials for the selected host, then start a conversation. Some remote providers must be configured on the host itself.
 
@@ -316,17 +250,6 @@ screen still addresses elements only.
 Self-test order on a phone: `screen` with `image` → `input` into a normal field → `input` with `submit` → `tap` with
 `text` → `scroll` with `until`. Details and limits are in [docs/input-en.md](docs/input-en.md)
 (Chinese: [docs/input-zh.md](docs/input-zh.md)).
-
-### Build and signing differences in this fork
-
-- Built with `tooling/build-apk.sh --build-name 1.0.15 -f arm64` on Windows, through
-  `toolchain/env-win.sh` (JDK 17, Flutter 3.47.7, Android SDK 36, NDK 28.2.13676358).
-- `runtime/out/arm64-v8a/{assets,jniLibs}` comes from the official upstream `v1.0.13` arm64
-  package, so the runtime is identical to upstream `v1.0.13`. It is gitignored, as upstream does —
-  only the app code differs.
-- There is no `app/android/key.properties`, so the APK is **debug-signed**. Android will refuse to
-  install it over the official release; uninstall that first, which clears app data (credentials
-  and the downloaded runtime). Verify the download against the SHA-256 in the release notes.
 
 ## Data and permissions
 
@@ -441,48 +364,26 @@ DSH_BETA_TOKEN_FILE= bash tooling/build-apk.sh --dry-run -f all
 
 ## Contribute
 
-Report bugs and suggest improvements in [Issues](../../issues); problems in upstream itself can go to the [upstream issue tracker](https://github.com/ccch1mneyyy/dsh-go/issues). For code, documentation and translation changes, start with [CONTRIBUTING.en.md](CONTRIBUTING.en.md). Plugin authors can use the [plugin guides](docs/plugins/en/README.md) and [SDK](sdk/plugin-kit/README.en.md).
+Report bugs and suggest improvements through [community Issues](https://github.com/puppy-bai/dsh-Go/issues). For documentation and development conventions, see [CONTRIBUTING.en.md](CONTRIBUTING.en.md). Plugin authors can use the [plugin guides](docs/plugins/en/README.md) and [SDK](sdk/plugin-kit/README.en.md).
 
-Report security issues through [SECURITY.en.md](SECURITY.en.md). Keep vulnerability details and credentials out of public issues.
-
-<a id="community"></a>
-
-## Community
-
-- **Forum**: [forum.dshtui.com](https://forum.dshtui.com)
-- **QQ group**: `1132118290` ([join](https://qm.qq.com/q/OEy2RqZnqY))
-- **WeChat group**: scan the code below; if it has expired, join the QQ group
-<!-- Telegram: link to come, add a line here -->
-
-<p align="center">
-  <a href="https://qm.qq.com/q/OEy2RqZnqY"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/qr-qq-en-dark.webp"><img src="docs/assets/qr-qq-en-light.webp" width="300" alt="QQ group DSH-Go!!, number 1132118290"></picture></a>&emsp;&emsp;<picture><source media="(prefers-color-scheme: dark)" srcset="docs/assets/qr-wechat-en-dark.webp"><img src="docs/assets/qr-wechat-en-light.webp" width="300" alt="WeChat group DSHGo 2群"></picture>
-</p>
-
-<p align="center">
-  <sub>QQ group <code>1132118290</code>. On a computer, <a href="https://qm.qq.com/q/OEy2RqZnqY">join with one click</a>. The WeChat code changes every week; if it has expired, join the QQ group.</sub>
-</p>
-
-## Friends' Links
-
-- **[DSH-TUI](https://dshtui.com/)**: the interactive terminal UI for DeepSeek Harness by the same author — the desktop counterpart to DSH Go, with a pixel whale, live status and time travel ([GitHub](https://github.com/ccch1mneyyy/dsh-TUI)).
+Report security issues through [SECURITY.en.md](SECURITY.en.md).
 
 ## License scope and redistribution
 
 The code is open source under [AGPL-3.0](LICENSE), and forking it to study, self-host or build on is welcome. Please respect the original author and project origin:
 
-- **Please contact the author before making modifications.** If you plan to modify this project, develop it further or publish a derivative product, please contact the original author, ccch1mneyyy, through [Issues](https://github.com/ccch1mneyyy/dsh-go/issues) or the [community](#community) in advance and describe your intended use and plans.
-- **Please credit the upstream repository and author in forks.** When publishing a modified version, please clearly credit <https://github.com/ccch1mneyyy/dsh-go> and the original author, [ccch1mneyyy](https://github.com/ccch1mneyyy), in the repository README, in-app About screen and release page. Retain copyright, license and modification notices as required by the applicable license.
+- Credit the original author ccch1mneyyy and upstream repository listed above. Retain the applicable copyright, licensing and modification notices.
 - **No unauthorized commercial reskins.** Do not use this project's brand graphics or protected assets, including Deepy and Whale girl, in reskinned products for sale, paid distribution or other commercial products without permission. Do not violate the applicable license by removing required copyright and license notices or distributing derivative code without the required source, or impersonate the original author or an official release.
 - **The name and assets are separate.** The DSH Go name and logo, and the Deepy and Whale girl mascots, are not covered by AGPL-3.0. Ship a modified build under your own name and assets; see [ASSETS.md](ASSETS.md).
 
-**License clarification:** AGPL-3.0 permits modification, redistribution and commercial use subject to its terms. Advance contact and the requested credit locations above are collaboration requests from the author, not additional restrictions on the code license. Brand and asset use remains subject to their own terms; this notice does not change the licenses of `sdk/`, `examples/` or third-party content.
+**License clarification:** AGPL-3.0 permits modification, redistribution and commercial use subject to its terms. Brand and asset use remains subject to their own terms; this notice does not change the licenses of `sdk/`, `examples/` or third-party content.
 
 ## License and acknowledgments
 
 This project is licensed under [AGPL-3.0](LICENSE). `sdk/` and `examples/` remain **MIT**. Third-party code and assets retain the terms stated in their own notices.
 
 - [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): the agent DSH Go runs and connects to.
-- [DSH-TUI](https://github.com/ccch1mneyyy/dsh-TUI): home of the mascots, Deepy and Whale girl.
+- DSH-TUI is the source of the Deepy and Whale girl mascots.
 
 Code derived from Phase is used with the author's permission. DeepSeek Harness, PiPilot, DS Bot, DSH Remote and other third-party components and assets retain their own licenses and attribution. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for sources and terms.
 
